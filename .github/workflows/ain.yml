@@ -1,4 +1,4 @@
-name: A31 Kernel Build (Auto-Patch Fix)
+name: A31 Kernel Build (Roaring Lionus - Final Fix)
 on: [push, workflow_dispatch]
 
 jobs:
@@ -12,11 +12,12 @@ jobs:
     - name: Checkout Source
       uses: actions/checkout@v4
 
-    # MTK device ke liye ye step skip kar sakte hain, par aapki marzi
     - name: Auto-Patch Paths
       run: |
-        echo "Patching header paths..."
+        # Jahan bhi <soc/qcom/...> hai use <linux/soc/qcom/...> se badal do
+        echo "Patching header paths for Oppo Secure Drivers..."
         find kernel-4.9 -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's|<soc/qcom/|<linux/soc/qcom/|g' {} +
+        echo "Patching completed."
 
     - name: Install Build Packages
       run: |
@@ -30,20 +31,24 @@ jobs:
         libx11-dev lib32z-dev libgl1-mesa-dev xsltproc unzip \
         device-tree-compiler libncurses5 libtinfo5 wget
 
-    - name: Sync Connectivity Drivers (KAGA Source)
+    - name: Sync and Patch Connectivity Drivers
       run: |
-        # Makefile ke mutabiq path create karein
+        # 1. Connectivity ke liye vendor path setup karein
         mkdir -p vendor/mediatek/kernel_modules/
         
-        # KAGA source ko temp folder mein clone karein
+        # 2. KAGA source se connectivity source uthayein
         git clone https://github.com/KAGA-KOKO/kernel-oppo6765 -b base-oss --depth=1 temp_kaga
         
-        # Connectivity folder ko correct location par move karein
+        # 3. Connectivity folder ko vendor path par move karein
         mv temp_kaga/drivers/misc/mediatek/connectivity vendor/mediatek/kernel_modules/
+        
+        # 4. Makefile mein build-in flag ko enable karein
+        # Isse symbolic links aur MT6765 specific configs active ho jayengi
+        sed -i 's/# export CONFIG_WLAN_DRV_BUILD_IN=y/export CONFIG_WLAN_DRV_BUILD_IN=y/g' kernel-4.9/drivers/misc/mediatek/connectivity/Makefile
         
         # Cleanup
         rm -rf temp_kaga
-        echo "Connectivity drivers integrated successfully."
+        echo "Connectivity source integrated and Makefile patched."
 
     - name: Download Toolchains
       run: |
@@ -65,7 +70,7 @@ jobs:
         make O=out mrproper
         make O=out oppo6765_19581_defconfig
         
-        # Build with Clang
+        # Kernel compilation with integrated connectivity and patched paths
         make -j$(nproc) O=out \
              CC=clang \
              CLANG_TRIPLE=$CLANG_TRIPLE \
@@ -80,4 +85,3 @@ jobs:
         path: |
           kernel-4.9/out/arch/arm64/boot/Image.gz-dtb
           kernel-4.9/out/.config
-
