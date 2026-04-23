@@ -1,4 +1,4 @@
-name: A31 Kernel Build (Roaring Lionus - Final Fix)
+name: A31 Kernel Build (Roaring Lionus - Connectivity Fix)
 on: [push, workflow_dispatch]
 
 jobs:
@@ -14,10 +14,9 @@ jobs:
 
     - name: Auto-Patch Paths
       run: |
-        # Jahan bhi <soc/qcom/...> hai use <linux/soc/qcom/...> se badal do
-        echo "Patching header paths for Oppo Secure Drivers..."
+        # Qualcomm paths ko fix karna (Header issues ke liye)
+        echo "Patching header paths..."
         find kernel-4.9 -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's|<soc/qcom/|<linux/soc/qcom/|g' {} +
-        echo "Patching completed."
 
     - name: Install Build Packages
       run: |
@@ -31,24 +30,31 @@ jobs:
         libx11-dev lib32z-dev libgl1-mesa-dev xsltproc unzip \
         device-tree-compiler libncurses5 libtinfo5 wget
 
-    - name: Sync and Patch Connectivity Drivers
+    - name: Sync Connectivity from KAGA Source
       run: |
-        # 1. Connectivity ke liye vendor path setup karein
+        # 1. Makefile ki requirement ke mutabiq vendor directory structure banayein
         mkdir -p vendor/mediatek/kernel_modules/
         
-        # 2. KAGA source se connectivity source uthayein
+        # 2. KAGA source clone karein
         git clone https://github.com/KAGA-KOKO/kernel-oppo6765 -b base-oss --depth=1 temp_kaga
         
-        # 3. Connectivity folder ko vendor path par move karein
+        # 3. KAGA ke 'drivers/misc/mediatek/connectivity' folder ko vendor path par move karein
+        # Isse common, wlan, bt etc folders Makefile ke mutabiq set ho jayenge
         mv temp_kaga/drivers/misc/mediatek/connectivity vendor/mediatek/kernel_modules/
         
-        # 4. Makefile mein build-in flag ko enable karein
-        # Isse symbolic links aur MT6765 specific configs active ho jayengi
+        # 4. Makefile mein built-in flag ko enable karein
+        # 'sed' command "#" ko hata kar export active kar degi
         sed -i 's/# export CONFIG_WLAN_DRV_BUILD_IN=y/export CONFIG_WLAN_DRV_BUILD_IN=y/g' kernel-4.9/drivers/misc/mediatek/connectivity/Makefile
         
-        # Cleanup
+        # 5. Debugging ke liye check karein ki target Makefile maujood hai ya nahi
+        if [ -f vendor/mediatek/kernel_modules/connectivity/wlan/core/gen4m/Makefile ]; then
+            echo "Connectivity Makefile found, proceeding..."
+        else
+            echo "ERROR: Connectivity Makefile NOT found in vendor path!"
+            exit 1
+        fi
+        
         rm -rf temp_kaga
-        echo "Connectivity source integrated and Makefile patched."
 
     - name: Download Toolchains
       run: |
@@ -70,7 +76,7 @@ jobs:
         make O=out mrproper
         make O=out oppo6765_19581_defconfig
         
-        # Kernel compilation with integrated connectivity and patched paths
+        # Build command (Connectivity built-in integrate ho jayegi)
         make -j$(nproc) O=out \
              CC=clang \
              CLANG_TRIPLE=$CLANG_TRIPLE \
