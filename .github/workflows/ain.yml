@@ -28,15 +28,15 @@ jobs:
 
     - name: Download Toolchains
       run: |
+        # Downloaded early to ensure environment is ready
         mkdir -p tools
-        # Clang and GCC downloaded early for the environment
         git clone https://github.com/KAGA-KOKO/clang-6.0.2 -b clang --depth=1 tools/clang
         git clone https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9 -b ndk-release-r16 --depth=1 tools/gcc64
         git clone https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9 -b ndk-release-r16 --depth=1 tools/gcc32
 
     - name: Connectivity Integration & Safe Patching
       run: |
-        # Kaga connectivity source integration
+        # Kaga connectivity integration
         rm -rf kernel-4.9/drivers/misc/mediatek/connectivity
         git clone https://github.com/KAGA-KOKO/kernel-oppo6765 -b base-oss --depth=1 temp_kaga
         mv temp_kaga/drivers/misc/mediatek/connectivity kernel-4.9/drivers/misc/mediatek/
@@ -46,30 +46,29 @@ jobs:
         echo "Patching legacy Qualcomm header paths safely..."
         find kernel-4.9 -path kernel-4.9/drivers/misc/mediatek/connectivity -prune -o -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's|<soc/qcom/|<linux/soc/qcom/|g' {} +
 
-    - name: Multimedia Setup
+    - name: Watchdog & Multimedia Fixes
       run: |
-        # No configure script found in source
-        # We only set the NOT_PREBUILT flag to force source compilation
-        export NOT_PREBUILT=yes
-        echo "Multimedia source ready for inline compilation."
-
-    - name: Config Tweaks & MediaTek Fixes
-      run: |
-        DEFCONFIG="kernel-4.9/arch/arm64/configs/oppo6765_19581_defconfig"
-        
-        # Watchdog Fix
+        # Watchdog v1 to v2 Symbolic Link (Mismatch Fix) - Using your confirmed working logic
         cd kernel-4.9/drivers/watchdog/mediatek/wdt/common/
-        if [ [ -d "wdt_v2" ]] && [[ ! -d "wdt_v1" ]]; then
+        if [ -d "wdt_v2" ] && [ ! -d "wdt_v1" ]; then
           ln -s wdt_v2 wdt_v1
+          echo "Watchdog v1 linked to v2 successfully!"
         fi
         cd ../../../../../..
+        
+        # Multimedia source flag
+        export NOT_PREBUILT=yes
+
+    - name: Config Tweaks
+      run: |
+        DEFCONFIG="kernel-4.9/arch/arm64/configs/oppo6765_19581_defconfig"
         
         # SELinux and Performance Tweaks
         sed -i 's/CONFIG_SECURITY_SELINUX=y/CONFIG_SECURITY_SELINUX=n/g' $DEFCONFIG
         echo "CONFIG_SECURITY_SELINUX_BOOTPARAM=y" >> $DEFCONFIG
         echo "CONFIG_SECURITY_SELINUX_DEVELOP=y" >> $DEFCONFIG
         
-        # HW Acceleration Fixes
+        # HW Acceleration & Multimedia Defconfig
         echo "CONFIG_MTK_VIDEOCODEC_DRIVER=y" >> $DEFCONFIG
         echo "CONFIG_MTK_SMI_EXT=y" >> $DEFCONFIG
         echo "CONFIG_MTK_CMDQ=y" >> $DEFCONFIG
