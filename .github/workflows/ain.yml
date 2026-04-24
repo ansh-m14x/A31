@@ -35,14 +35,16 @@ jobs:
 
     - name: KernelSU-Next & SELinux Hard-Patch
       run: |
-        # Kernel directory ke andar jaana zaroori hai setup script ke liye
         cd kernel-4.9
         
-        # Integrate KernelSU-Next Legacy Branch
+        # Integrate KernelSU-Next Legacy
         curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/legacy/kernel/setup.sh" | bash -s legacy
 
+        # FIX: Manual Hooks Error (Kbuild 142 fix)
+        # Isse KernelSU ko pata chal jayega ki hum manually hook kar rahe hain
+        echo "ccflags-y += -DKSU_EXPECTED_SIZE=0x3e6" >> drivers/kernelsu/Makefile
+        
         # SELinux Permissive Hard-Patch (hooks.c)
-        # Isse 'enforcing = 1' hamesha ke liye 0 ho jayega
         sed -i 's/int selinux_enforcing = 1;/int selinux_enforcing = 0;/g' security/selinux/hooks.c
         sed -i 's/selinux_enforcing = 1/selinux_enforcing = 0/g' security/selinux/hooks.c
         
@@ -58,8 +60,6 @@ jobs:
         git clone https://github.com/KAGA-KOKO/kernel-oppo6765 -b base-oss --depth=1 temp_kaga
         mv temp_kaga/drivers/misc/mediatek/connectivity kernel-4.9/drivers/misc/mediatek/
         rm -rf temp_kaga
-        
-        # Safe Header Patching
         find kernel-4.9 -path kernel-4.9/drivers/misc/mediatek/connectivity -prune -o -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's|<soc/qcom/|<linux/soc/qcom/|g' {} +
 
     - name: Watchdog Fix
@@ -67,7 +67,6 @@ jobs:
         cd kernel-4.9/drivers/watchdog/mediatek/wdt/common/
         if [ -d "wdt_v2" ] && [ ! -d "wdt_v1" ]; then
           ln -s wdt_v2 wdt_v1
-          echo "Watchdog v1 link created."
         fi
         cd ../../../../../..
 
@@ -79,15 +78,14 @@ jobs:
         echo "CONFIG_KSU=y" >> $DEFCONFIG
         echo "CONFIG_OVERLAY_FS=y" >> $DEFCONFIG
         
-        # SELinux and Performance Tweaks
+        # SELinux Permissive Tweaks
         sed -i 's/CONFIG_SECURITY_SELINUX=y/CONFIG_SECURITY_SELINUX=n/g' $DEFCONFIG
         sed -i 's/CONFIG_CMDLINE="/CONFIG_CMDLINE="androidboot.selinux=permissive /g' $DEFCONFIG
         
-        # HW Acceleration & Other Fixes
+        # Additional Fixes
         echo "CONFIG_MTK_VIDEOCODEC_DRIVER=y" >> $DEFCONFIG
         echo "CONFIG_MTK_SMI_EXT=y" >> $DEFCONFIG
         echo "CONFIG_MTK_CMDQ=y" >> $DEFCONFIG
-        echo "CONFIG_MTK_FLASHLIGHT_MT6370=y" >> $DEFCONFIG
         echo "CONFIG_PROCESS_RECLAIM=y" >> $DEFCONFIG
         echo "CONFIG_PGTABLE_MAPPING=y" >> $DEFCONFIG
 
@@ -105,7 +103,6 @@ jobs:
         make O=out mrproper
         make O=out oppo6765_19581_defconfig
         
-        # Image Build
         make -j$(nproc) O=out \
              CC=clang \
              CLANG_TRIPLE=$CLANG_TRIPLE \
@@ -113,7 +110,6 @@ jobs:
              CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
              Image.gz-dtb
              
-        # Modules Build (For Wi-Fi/BT manually)
         make -j$(nproc) O=out \
              CC=clang \
              CLANG_TRIPLE=$CLANG_TRIPLE \
