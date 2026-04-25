@@ -1,4 +1,4 @@
-name: A31 Kernel Build - Bootable Ultimate Fix
+name: A31 Kernel Build - Stock SELinux Bootable
 on:
   push:
   workflow_dispatch:
@@ -33,56 +33,44 @@ jobs:
         git clone https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9 -b ndk-release-r16 --depth=1 tools/gcc64
         git clone https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9 -b ndk-release-r16 --depth=1 tools/gcc32
 
-    - name: Essential Fixes (Watchdog Only)
+    - name: Watchdog Fix Only
       run: |
-        # Hum koi SELinux hard-patch nahi karenge code mein (Boot safe rakhne ke liye)
+        # Koi SELinux patch nahi, sirf MTK Watchdog fix
         cd kernel-4.9/drivers/watchdog/mediatek/wdt/common/
         if [ -d "wdt_v2" ] && [ ! -d "wdt_v1" ]; then ln -s wdt_v2 wdt_v1; fi
         cd ../../../../../..
 
     - name: Connectivity Integration
       run: |
-        # Drivers swap
         rm -rf kernel-4.9/drivers/misc/mediatek/connectivity
         git clone https://github.com/KAGA-KOKO/kernel-oppo6765 -b base-oss --depth=1 temp_kaga
         mv temp_kaga/drivers/misc/mediatek/connectivity kernel-4.9/drivers/misc/mediatek/
         rm -rf temp_kaga
-        
-        # Flashlight & Connectivity Header Path Fix
         find kernel-4.9 -path kernel-4.9/drivers/misc/mediatek/connectivity -prune -o -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's|<soc/qcom/|<linux/soc/qcom/|g' {} +
 
-    - name: Ultimate Config Tweaks (The Bootable Logic)
+    - name: Standard Config (Boot Priority)
       run: |
         DEFCONFIG="kernel-4.9/arch/arm64/configs/oppo6765_19581_defconfig"
         
-        # 1. Multimedia & ISP Hardware Force
-        echo "CONFIG_MTK_SMI_EXT=y" >> $DEFCONFIG
-        echo "CONFIG_MTK_VIDEOCODEC_DRIVER=y" >> $DEFCONFIG
-        echo "CONFIG_VIDEO_MEDIATEK_VPU=y" >> $DEFCONFIG
-        echo "CONFIG_VIDEO_MEDIATEK_VCODEC=y" >> $DEFCONFIG
-        echo "CONFIG_MTK_ISP_V4L2=y" >> $DEFCONFIG
-        echo "CONFIG_MTK_DIP_HW=y" >> $DEFCONFIG
-        
-        # 2. Camera Framework (Sensors & V4L2)
+        # 1. Camera & Multimedia (Keeping it safe)
         echo "CONFIG_VIDEO_V4L2=y" >> $DEFCONFIG
         echo "CONFIG_MTK_V4L2_ADAPTER=y" >> $DEFCONFIG
         echo "CONFIG_MTK_IMGSENSOR=y" >> $DEFCONFIG
-        echo "CONFIG_MTK_CAM_CAL=y" >> $DEFCONFIG
+        echo "CONFIG_MTK_VIDEOCODEC_DRIVER=y" >> $DEFCONFIG
         
-        # 3. Flashlight Fix
+        # 2. Flashlight Fix
         sed -i 's/CONFIG_MTK_FLASHLIGHT_MT6370=n/CONFIG_MTK_FLASHLIGHT_MT6370=y/g' $DEFCONFIG
         echo "CONFIG_RT_FLASHLIGHT=y" >> $DEFCONFIG
         
-        # 4. Safe SELinux (Keeping it stock but requesting permissive)
-        # Isse kernel panic nahi hoga
-        echo "CONFIG_SECURITY_SELINUX=y" >> $DEFCONFIG
-        echo "CONFIG_SECURITY_SELINUX_BOOTPARAM=y" >> $DEFCONFIG
-        echo "CONFIG_SECURITY_SELINUX_BOOTPARAM_VALUE=0" >> $DEFCONFIG
+        # 3. STOCK SELINUX - HTA DIYE SAARE PERMISSIVE FLAGS
+        # Hum default defconfig ko hi follow karenge
+        sed -i '/CONFIG_SECURITY_SELINUX_BOOTPARAM/d' $DEFCONFIG
+        sed -i '/androidboot.selinux/d' $DEFCONFIG
         
-        # 5. CMDLINE (Permissive Request)
+        # 4. Clean CMDLINE (No forced arguments)
         sed -i '/CONFIG_CMDLINE=/d' $DEFCONFIG
-        echo 'CONFIG_CMDLINE="console=tty0 console=ttyMT3,921600n1 androidboot.selinux=permissive"' >> $DEFCONFIG
-        echo "CONFIG_CMDLINE_FORCE=y" >> $DEFCONFIG
+        echo 'CONFIG_CMDLINE="console=tty0 console=ttyMT3,921600n1"' >> $DEFCONFIG
+        echo "CONFIG_CMDLINE_FORCE=n" >> $DEFCONFIG
 
     - name: Compile Kernel
       run: |
@@ -101,5 +89,5 @@ jobs:
     - name: Upload Build
       uses: actions/upload-artifact@v4
       with:
-        name: A31-Ultimate-Bootable-Clean
+        name: A31-Stock-SELinux-Build
         path: kernel-4.9/out/arch/arm64/boot/Image.gz-dtb
