@@ -515,3 +515,14 @@ CONFIG_MTK_PARTITION_SETTING=y
 # Required for Userspace Fastboot (Fastbootd)
 CONFIG_ANDROID_FG_INTF=y
 
+# Device Mapper (Logical Partitioning ke liye sabse zaroori)
+CONFIG_DM_SNAPSHOT=y
+CONFIG_DM_MIRROR=y
+CONFIG_DM_ZERO=y
+
+# Retrofit / Dynamic Partition Specific
+CONFIG_DM_BOW=y
+CONFIG_DM_ANDROID_VERITY_AT_MOST_ONCE=y
+
+# Device Mapper Uevent (Takki Recovery ko partitions mil sakein)
+CONFIG_DM_UEVENT=y
