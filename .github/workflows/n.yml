@@ -1,6 +1,11 @@
 name: Sync F2FS from A15
 on:
-  workflow_dispatch: # Isse tum manually button daba kar run kar sakoge
+  workflow_dispatch:
+
+# --- YE BLOCK ADD KARO ---
+permissions:
+  contents: write
+# -------------------------
 
 jobs:
   copy-f2fs:
@@ -9,8 +14,6 @@ jobs:
       - name: Checkout A31 Repo (Target)
         uses: actions/checkout@v4
         with:
-          repository: ansh-m14x/A31
-          token: ${{ secrets.GITHUB_TOKEN }}
           path: a31_repo
 
       - name: Checkout A15 Repo (Source)
@@ -21,9 +24,7 @@ jobs:
 
       - name: Copy F2FS Folder
         run: |
-          # Pehle check karo target folder hai ya nahi
           mkdir -p a31_repo/kernel-4.9/fs/
-          # A15 se copy karo A31 mein
           cp -rv a15_repo/kernel-4.9/fs/f2fs a31_repo/kernel-4.9/fs/
           
       - name: Commit and Push changes
@@ -32,6 +33,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add kernel-4.9/fs/f2fs
-          git commit -m "Add F2FS filesystem drivers from Oppo A15" || echo "No changes to commit"
+          git commit -m "Add F2FS filesystem drivers from Oppo A15" || exit 0
           git push
-
