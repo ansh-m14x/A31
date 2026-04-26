@@ -2,10 +2,8 @@ name: Sync F2FS from A15
 on:
   workflow_dispatch:
 
-# --- YE BLOCK ADD KARO ---
 permissions:
   contents: write
-# -------------------------
 
 jobs:
   copy-f2fs:
@@ -22,10 +20,28 @@ jobs:
           repository: oppo-source/A15
           path: a15_repo
 
-      - name: Copy F2FS Folder
+      - name: Sync F2FS and Missing Headers
         run: |
+          # 1. Copy F2FS Driver
           mkdir -p a31_repo/kernel-4.9/fs/
           cp -rv a15_repo/kernel-4.9/fs/f2fs a31_repo/kernel-4.9/fs/
+
+          # 2. Copy missing overflow.h (Fixes the fatal error)
+          mkdir -p a31_repo/kernel-4.9/include/linux/
+          if [ -f a15_repo/kernel-4.9/include/linux/overflow.h ]; then
+            cp -v a15_repo/kernel-4.9/include/linux/overflow.h a31_repo/kernel-4.9/include/linux/
+          fi
+
+          # 3. Copy f2fs_fs.h (Essential for F2FS compilation)
+          if [ -f a15_repo/kernel-4.9/include/linux/f2fs_fs.h ]; then
+            cp -v a15_repo/kernel-4.9/include/linux/f2fs_fs.h a31_repo/kernel-4.9/include/linux/
+          fi
+
+          # 4. Copy UAPI headers (User API for tools like make_f2fs)
+          mkdir -p a31_repo/kernel-4.9/include/uapi/linux/
+          if [ -f a15_repo/kernel-4.9/include/uapi/linux/f2fs.h ]; then
+            cp -v a15_repo/kernel-4.9/include/uapi/linux/f2fs.h a31_repo/kernel-4.9/include/uapi/linux/
+          fi
           
       - name: Commit and Push changes
         run: |
@@ -33,5 +49,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add kernel-4.9/fs/f2fs
-          git commit -m "Add F2FS filesystem drivers from Oppo A15" || exit 0
+          git add kernel-4.9/include/linux/overflow.h || echo "No overflow.h to add"
+          git add kernel-4.9/include/linux/f2fs_fs.h || echo "No f2fs_fs.h to add"
+          git add kernel-4.9/include/uapi/linux/f2fs.h || echo "No uapi header to add"
+          git commit -m "Sync F2FS and missing headers from Oppo A15" || exit 0
           git push
