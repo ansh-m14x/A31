@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 MediaTek Inc.
+ * Copyright (C) 2016 MediaTek Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -27,8 +27,7 @@
 #include "cam_cal.h"
 #include "cam_cal_define.h"
 #include "cam_cal_list.h"
-#include "eeprom_i2c_dev.h"
-#include "eeprom_i2c_common_driver.h"
+/*#include <asm/system.h>  // for SM*/
 #include <linux/dma-mapping.h>
 #ifdef CONFIG_COMPAT
 /* 64 bit */
@@ -36,26 +35,13 @@
 #include <linux/compat.h>
 #endif
 
-#ifdef ODM_WT_EDIT
-/* Danfeng.Zhang@Camera.Driver, 2020/01/03, add for [otp bringup] */
-#undef CAM_CAL_DEBUG
-#define PK_INF(format, args...) \
-	pr_info(PFX "[%s] " format, __func__, ##args)
-#define PK_ERR(format, args...) \
-	pr_err(PFX "[%s] " format, __func__, ##args)
-#ifdef CAM_CAL_DEBUG
-/* Quan.Zhen@Camera.Driver, 2019/10/12, add for [otp bringup] */
-#define PK_DBG(format, args...) \
-	pr_info(PFX "[%s] " format, __func__, ##args)
-#else
-#define PK_DBG(format, args...) \
-	pr_debug(PFX "[%s] " format, __func__, ##args)
-#endif
-#endif
+
 
 #define CAM_CAL_DRV_NAME "CAM_CAL_DRV"
 #define CAM_CAL_DEV_MAJOR_NUMBER 226
 
+#define CAM_CAL_I2C_MAX_BUSNUM 2
+#define CAM_CAL_I2C_MAX_SENSOR 4
 #define CAM_CAL_MAX_BUF_SIZE 65536	/*For Safety, Can Be Adjested */
 
 #define CAM_CAL_I2C_DEV1_NAME CAM_CAL_DRV_NAME
@@ -67,23 +53,24 @@ static dev_t g_devNum = MKDEV(CAM_CAL_DEV_MAJOR_NUMBER, 0);
 static struct cdev *g_charDrv;
 static struct class *g_drvClass;
 static unsigned int g_drvOpened;
-struct i2c_client *g_pstI2Cclients[I2C_DEV_IDX_MAX] = { NULL };
+static struct i2c_client *g_pstI2Cclient;
+static struct i2c_client *g_pstI2Cclient2;
+static struct i2c_client *g_pstI2Cclient3;
 
 
-#ifdef ODM_WT_EDIT
-/* Zhen.Quan@Camera.Driver, 2019/10/17, add for [otp bringup] */
-#include "kd_imgsensor.h"
-struct stCAM_CAL_DATAINFO_STRUCT *g_eepromMainData = NULL;
-struct stCAM_CAL_DATAINFO_STRUCT *g_eepromSubData = NULL;
-struct stCAM_CAL_DATAINFO_STRUCT *g_eepromMain2Data = NULL;
-struct stCAM_CAL_DATAINFO_STRUCT *g_eepromSub2Data = NULL;
-struct stCAM_CAL_DATAINFO_STRUCT *g_eepromMain3Data = NULL;
-
-//extern int hardwareinfo_set_prop(int cmd, const char *name);
-#define CAM_CAL_I2C_MAX_SENSOR 4
-#endif
 
 static DEFINE_SPINLOCK(g_spinLock);	/*for SMP */
+
+enum CAM_CAL_BUS_ID {
+	BUS_ID_MAIN = 0,
+	BUS_ID_SUB,
+	BUS_ID_MAIN2,
+	BUS_ID_SUB2,
+	BUS_ID_MAX,
+};
+
+static enum CAM_CAL_BUS_ID g_curBusIdx = BUS_ID_MAIN;
+static struct i2c_client *g_Current_Client;
 
 
 /*Note: Must Mapping to IHalSensor.h*/
@@ -95,7 +82,6 @@ enum {
 	SENSOR_DEV_MAIN_2 = 0x04,
 	SENSOR_DEV_MAIN_3D = 0x05,
 	SENSOR_DEV_SUB_2 = 0x08,
-	SENSOR_DEV_MAIN_3 = 0x10,
 	SENSOR_DEV_MAX = 0x50
 };
 
@@ -107,62 +93,51 @@ static unsigned int g_lastDevID = SENSOR_DEV_NONE;
 struct stCAM_CAL_CMD_INFO_STRUCT {
 	unsigned int sensorID;
 	unsigned int deviceID;
-	unsigned int i2cAddr;
 	struct i2c_client *client;
 	cam_cal_cmd_func readCMDFunc;
 	cam_cal_cmd_func writeCMDFunc;
-	unsigned int maxEepromSize;
 };
 
-static struct stCAM_CAL_CMD_INFO_STRUCT g_camCalDrvInfo[CAM_CAL_SENSOR_IDX_MAX];
+static struct stCAM_CAL_CMD_INFO_STRUCT g_camCalDrvInfo[CAM_CAL_I2C_MAX_SENSOR];
 
 /********************************************************************
  * EEPROM_set_i2c_bus()
- * To i2c client and slave id
+ * To Setting current index of Bus and Device, and current client.
  ********************************************************************/
 
-static int EEPROM_set_i2c_bus(unsigned int deviceID,
-			      struct stCAM_CAL_CMD_INFO_STRUCT *cmdInfo)
+static int EEPROM_set_i2c_bus(unsigned int deviceID)
 {
-	enum CAM_CAL_SENSOR_IDX idx;
-	struct i2c_client *client;
-
 	switch (deviceID) {
 	case SENSOR_DEV_MAIN:
-		idx = CAM_CAL_SENSOR_IDX_MAIN;
+		g_curBusIdx = BUS_ID_MAIN;
+		g_Current_Client = g_pstI2Cclient;
 		break;
 	case SENSOR_DEV_SUB:
-		idx = CAM_CAL_SENSOR_IDX_SUB;
+		g_curBusIdx = BUS_ID_SUB;
+		g_Current_Client = g_pstI2Cclient2;
 		break;
 	case SENSOR_DEV_MAIN_2:
-		idx = CAM_CAL_SENSOR_IDX_MAIN2;
+		g_curBusIdx = BUS_ID_MAIN2;
+		g_Current_Client = g_pstI2Cclient3;
 		break;
 	case SENSOR_DEV_SUB_2:
-		idx = CAM_CAL_SENSOR_IDX_SUB2;
-		break;
-	case SENSOR_DEV_MAIN_3:
-		idx = CAM_CAL_SENSOR_IDX_MAIN3;
+		g_curBusIdx = BUS_ID_SUB2;
+		g_Current_Client = g_pstI2Cclient;
 		break;
 	default:
 		return -EFAULT;
 	}
-	client = g_pstI2Cclients[get_i2c_dev_sel(idx)];
-	pr_debug("%s end! deviceID=%d index=%u client=%p\n",
-		 __func__, deviceID, idx, client);
+	pr_debug("Set i2c bus end! deviceID=%d g_curBusIdx=%d g_Current=%p\n",
+	       deviceID, g_curBusIdx, g_Current_Client);
 
-	if (client == NULL) {
-		pr_err("i2c client is NULL");
+	if (g_Current_Client == NULL) {
+		pr_debug("g_Current_Client is NULL");
 		return -EFAULT;
 	}
 
-	if (cmdInfo != NULL) {
-		client->addr = cmdInfo->i2cAddr;
-		cmdInfo->client = client;
-	}
-
 	return 0;
-}
 
+}
 
 
 /*************************************************
@@ -180,24 +155,20 @@ static int EEPROM_get_cmd_info(unsigned int sensorID,
 		pr_debug("pCamCalList!=NULL && pCamCalFunc!= NULL\n");
 		for (i = 0; pCamCalList[i].sensorID != 0; i++) {
 			if (pCamCalList[i].sensorID == sensorID) {
+				g_Current_Client->addr =
+					pCamCalList[i].slaveID >> 1;
+				cmdInfo->client = g_Current_Client;
+
 				pr_debug("pCamCalList[%d].sensorID==%x\n", i,
 				       pCamCalList[i].sensorID);
+				pr_debug("Current_Client->addr =%x\n",
+						g_Current_Client->addr);
+				pr_debug("main=%p sub=%p main2=%p Cur=%p\n",
+				       g_pstI2Cclient, g_pstI2Cclient2,
+				       g_pstI2Cclient3, g_Current_Client);
 
-				cmdInfo->i2cAddr = pCamCalList[i].slaveID >> 1;
 				cmdInfo->readCMDFunc =
 					pCamCalList[i].readCamCalData;
-				cmdInfo->maxEepromSize =
-					pCamCalList[i].maxEepromSize;
-
-				/*
-				 * Default 8K for Common_read_region driver
-				 * 0 for others
-				 */
-				if (cmdInfo->readCMDFunc == Common_read_region
-				    && cmdInfo->maxEepromSize == 0) {
-					cmdInfo->maxEepromSize =
-						DEFAULT_MAX_EEPROM_SIZE_8K;
-				}
 
 				return 1;
 			}
@@ -213,14 +184,14 @@ static struct stCAM_CAL_CMD_INFO_STRUCT *EEPROM_get_cmd_info_ex
 	int i = 0;
 
 	/* To check device ID */
-	for (i = 0; i < CAM_CAL_SENSOR_IDX_MAX; i++) {
+	for (i = 0; i < CAM_CAL_I2C_MAX_SENSOR; i++) {
 		if (g_camCalDrvInfo[i].deviceID == deviceID)
 			break;
 	}
 	/* To check cmd from Sensor ID */
 
-	if (i == CAM_CAL_SENSOR_IDX_MAX) {
-		for (i = 0; i < CAM_CAL_SENSOR_IDX_MAX; i++) {
+	if (i == CAM_CAL_I2C_MAX_SENSOR) {
+		for (i = 0; i < CAM_CAL_I2C_MAX_SENSOR; i++) {
 			/* To Set Client */
 			if (g_camCalDrvInfo[i].sensorID == 0) {
 				pr_debug("Start get_cmd_info!\n");
@@ -238,228 +209,12 @@ static struct stCAM_CAL_CMD_INFO_STRUCT *EEPROM_get_cmd_info_ex
 		}
 	}
 
-	if (i == CAM_CAL_SENSOR_IDX_MAX) {	/*g_camCalDrvInfo is full */
+	if (i == CAM_CAL_I2C_MAX_SENSOR) {	/*g_camCalDrvInfo is full */
 		return NULL;
 	} else {
 		return &g_camCalDrvInfo[i];
 	}
 }
-
-#ifdef ODM_WT_EDIT
-/* Quan.Zhen@Camera.Driver, 2019/10/12, add for [otp bringup] */
-static  void EEPROM_reset_cmd_info_ex
-	(unsigned int sensorID, unsigned int deviceID){
-	int i = 0;
-	for (i = 0; i < CAM_CAL_I2C_MAX_SENSOR; i++) {
-		if ((g_camCalDrvInfo[i].deviceID == deviceID)&&(sensorID == g_camCalDrvInfo[i].sensorID)){
-			g_camCalDrvInfo[i].deviceID = 0;
-			g_camCalDrvInfo[i].sensorID = 0;
-		}
-	}
-}
-
-void dumpEEPROMData(int u4Length,u8* pu1Params, int deviceid)
-{
-#ifdef CAM_CAL_DEBUG
-	int i = 0;
-
-    PK_INF("######################### start dump eeprom data, deviceID=%d #################\n", deviceid);
-
-	for(i = 0; i < u4Length; i += 16){
-		if(u4Length - i  >= 16){
-			PK_INF("eeprom[%d-%d]:0x%2x 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x 0x%2x ",
-			i,i+15,pu1Params[i],pu1Params[i+1],pu1Params[i+2],pu1Params[i+3],pu1Params[i+4],pu1Params[i+5],pu1Params[i+6]
-			,pu1Params[i+7],pu1Params[i+8],pu1Params[i+9],pu1Params[i+10],pu1Params[i+11],pu1Params[i+12],pu1Params[i+13],pu1Params[i+14]
-			,pu1Params[i+15]);
-		}else{
-			int j = i;
-			for(;j < u4Length;j++)
-			PK_INF("eeprom[%d] = 0x%2x ",j,pu1Params[j]);
-		}
-	}
-	PK_INF("\n");
-    PK_INF("######################### end dump eeprom data, deviceID=%d #################\n", deviceid);
-#endif
-}
-
-int imgSensorCheckEepromData(struct stCAM_CAL_DATAINFO_STRUCT* pData, struct stCAM_CAL_CHECKSUM_STRUCT* cData){
-	u8* buffer = NULL;
-	int i = 0;
-	int length = 0;
-	int count;
-	u32 sum = 0;
-	/* Zhen.Quan@Camera.Driver, 2019/10/17, add for [otp bringup] */
-	if((pData != NULL)&&(pData->dataBuffer != NULL)&&(cData != NULL)) {
-		buffer = pData->dataBuffer;
-		//verity validflag and checksum
-		for((count = 0);count < MAX_ITEM;count++){
-			if((cData[count].item < MAX_ITEM)){
-				if(cData[count].flagAdrees != cData[count].startAdress) {
-					if(buffer[cData[count].flagAdrees]!= cData[count].validFlag){
-						PK_ERR("oppo invalid otp data cItem=%d,flag=%d failed\n", cData[count].item,buffer[cData[count].flagAdrees]);
-						//return -ENODEV;
-					} else {
-						PK_INF("oppo check cTtem=%d,flag=0x%x otp flag data successful!\n", cData[count].item,buffer[cData[count].flagAdrees]);
-					}
-
-					sum = 0;
-					length = cData[count].endAdress - cData[count].startAdress;
-					for(i = 0;i <= length;i++){
-						sum += buffer[cData[count].startAdress+i];
-					}
-					if((sum%0xff)!= buffer[cData[count].checksumAdress]) {
-						PK_ERR("oppo checksum cItem=%d,0x%x,length = 0x%x failed(saddr=0x%x, eaddr=0x%x)!\n",cData[count].item,sum,length,
-							cData[count].startAdress,cData[count].endAdress);
-						//return -ENODEV;
-					} else {
-						PK_INF("oppo checksum cItem=%d,0x%x,length = 0x%x successful!\n",cData[count].item,sum,length);
-					}
-				}else {
-					if(buffer[cData[count].flagAdrees]!= cData[count].validFlag){
-						PK_ERR("wt invalid otp data cItem=%d,flag=%d failed\n", cData[count].item,buffer[cData[count].flagAdrees]);
-						//return -ENODEV;
-					} else {
-						PK_INF("wt check cTtem=%d,flag=0x%x otp flag data successful!\n", cData[count].item,buffer[cData[count].flagAdrees]);
-					}
-
-					sum = 0;
-					length = cData[count].endAdress - cData[count].startAdress;
-					for(i = 0;i <= length;i++){
-						sum += buffer[cData[count].startAdress+i];
-					}
-					if((sum%0xff)+1!= buffer[cData[count].checksumAdress]) {
-						PK_ERR("wt checksum cItem=%d,0x%x,length = 0x%x failed(saddr=0x%x, eaddr=0x%x)!\n",cData[count].item,sum,length,
-							cData[count].startAdress,cData[count].endAdress);
-						//return -ENODEV;
-					} else {
-						PK_INF("wt checksum cItem=%d,0x%x,length = 0x%x successful!\n",cData[count].item,sum,length);
-					}
-				}
-			}else {
-				break;
-			}
-          }
-	}else {
-		PK_ERR("some data not inited!\n");
-		return -ENODEV;
-	}
-
-	PK_INF("sensor[0x%x][0x%x] eeprom checksum success\n", pData->sensorID, pData->deviceID);
-
-	return 0;
-}
-
-int imgSensorReadEepromData(struct stCAM_CAL_DATAINFO_STRUCT* pData, struct stCAM_CAL_CHECKSUM_STRUCT* checkData){
-    struct stCAM_CAL_CMD_INFO_STRUCT *pcmdInf = NULL;
-	int i4RetValue = -1;
-	u32 vendorID = 0;
-	u8 tmpBuf[2] = {0};
-	if((pData == NULL)||(checkData == NULL)){
-		PK_ERR("pData or checkData not inited!\n");
-		return -EFAULT;
-	}
-
-	PK_INF("SensorID=%x DeviceID=%x\n",pData->sensorID, pData->deviceID);
-
-	pcmdInf = EEPROM_get_cmd_info_ex(pData->sensorID, pData->deviceID);
-	if (pcmdInf != NULL) {
-		if(EEPROM_set_i2c_bus(pData->deviceID,pcmdInf) != 0) {
-			PK_ERR("deviceID Error!\n");
-			return -EFAULT;
-		}
-		if (pcmdInf->readCMDFunc != NULL){
-			if (pData->dataBuffer == NULL){
-				pData->dataBuffer = kmalloc(pData->dataLength, GFP_KERNEL);
-				if (pData->dataBuffer == NULL) {
-					PK_ERR("pData->dataBuffer is malloc fail\n");
-					return -EFAULT;
-				}
-			}
-			//verity vendorID
-			i4RetValue = pcmdInf->readCMDFunc(pcmdInf->client, pData->vendorByte, &tmpBuf[0], 1);
-			if(i4RetValue != 1){
-				PK_ERR("vendorID read falied 0x%x != 0x%x\n",tmpBuf[0], pData->sensorVendorid >> 24);
-                kfree(pData->dataBuffer);
-				pData->dataBuffer = NULL;
-                EEPROM_reset_cmd_info_ex(pData->sensorID, pData->deviceID);
-				return -EFAULT;
-			}
-			vendorID = tmpBuf[0];
-			if(vendorID != pData->sensorVendorid >> 24) {
-				PK_ERR("vendorID cmp falied 0x%x != 0x%x\n",vendorID, pData->sensorVendorid >> 24);
-                kfree(pData->dataBuffer);
-				pData->dataBuffer = NULL;
-                EEPROM_reset_cmd_info_ex(pData->sensorID, pData->deviceID);
-				return -EFAULT;
-			}
-			//get eeprom data
-			i4RetValue = pcmdInf->readCMDFunc(pcmdInf->client, 0, pData->dataBuffer, pData->dataLength);
-			if(i4RetValue != pData->dataLength) {
-				kfree(pData->dataBuffer);
-				pData->dataBuffer = NULL;
-				PK_ERR("readCMDFunc failed\n");
-				EEPROM_reset_cmd_info_ex(pData->sensorID, pData->deviceID);
-				return -EFAULT;
-			}else{
-				if(imgSensorCheckEepromData(pData,checkData) != 0){
-					kfree(pData->dataBuffer);
-					pData->dataBuffer = NULL;
-					PK_ERR("checksum failed\n");
-					EEPROM_reset_cmd_info_ex(pData->sensorID, pData->deviceID);
-					return -EFAULT;
-				}
-				PK_INF("SensorID=%x DeviceID=%x read otp data success\n", pData->sensorID, pData->deviceID);
-			}
-		} else {
-			PK_ERR("pcmdInf->readCMDFunc == NULL\n");
-		}
-	} else {
-		PK_ERR("pcmdInf == NULL\n");
-    }
-
-	return i4RetValue;
-}
-
-int imgSensorSetEepromData(struct stCAM_CAL_DATAINFO_STRUCT* pData){
-	int i4RetValue = 0;
-	PK_INF("pData->deviceID = %d\n",pData->deviceID);
-	/* Zhen.Quan@Camera.Driver, 2019/10/17, add for [otp bringup] */
-	if(pData->deviceID == 0x01){
-		if(g_eepromMainData != NULL){
-			return -ETXTBSY;
-		}
-		g_eepromMainData = pData;
-	}
-	else if(pData->deviceID == 0x02) {
-		if(g_eepromSubData != NULL){
-			return -ETXTBSY;
-		}
-		g_eepromSubData = pData;
-	}
-	else if(pData->deviceID == 0x04) {
-		if(g_eepromMain2Data != NULL){
-			return -ETXTBSY;
-		}
-		g_eepromMain2Data = pData;
-	}else if(pData->deviceID == 0x08) {
-		if(g_eepromSub2Data != NULL){
-			return -ETXTBSY;
-		}
-		g_eepromSub2Data = pData;
-	}else if(pData->deviceID == 0x10) {
-		if(g_eepromMain3Data != NULL){
-			return -ETXTBSY;
-		}
-		g_eepromMain3Data = pData;
-	}else{
-	    PK_ERR("we don't have this devices\n");
-	    return -ENODEV;
-	}
-    if(pData->dataBuffer)
-	   dumpEEPROMData(pData->dataLength,pData->dataBuffer,pData->deviceID);
-	return i4RetValue;
-}
-#endif
 
 /**************************************************
  * EEPROM_HW_i2c_probe
@@ -469,16 +224,16 @@ static int EEPROM_HW_i2c_probe
 {
 	/* get sensor i2c client */
 	spin_lock(&g_spinLock);
-	g_pstI2Cclients[I2C_DEV_IDX_1] = client;
+	g_pstI2Cclient = client;
 
 	/* set I2C clock rate */
 #ifdef CONFIG_MTK_I2C_EXTENSION
-	g_pstI2Cclients[I2C_DEV_IDX_1]->timing = gi2c_dev_timing[I2C_DEV_IDX_1];
-	g_pstI2Cclients[I2C_DEV_IDX_1]->ext_flag &= ~I2C_POLLING_FLAG;
+	g_pstI2Cclient->timing = 100;	/* 100k */
+	g_pstI2Cclient->ext_flag &= ~I2C_POLLING_FLAG;
 #endif
 
 	/* Default EEPROM Slave Address Main= 0xa0 */
-	g_pstI2Cclients[I2C_DEV_IDX_1]->addr = 0x50;
+	g_pstI2Cclient->addr = 0x50;
 	spin_unlock(&g_spinLock);
 
 	return 0;
@@ -502,16 +257,16 @@ static int EEPROM_HW_i2c_probe2
 {
 	/* get sensor i2c client */
 	spin_lock(&g_spinLock);
-	g_pstI2Cclients[I2C_DEV_IDX_2] = client;
+	g_pstI2Cclient2 = client;
 
 	/* set I2C clock rate */
 #ifdef CONFIG_MTK_I2C_EXTENSION
-	g_pstI2Cclients[I2C_DEV_IDX_2]->timing = gi2c_dev_timing[I2C_DEV_IDX_2];
-	g_pstI2Cclients[I2C_DEV_IDX_2]->ext_flag &= ~I2C_POLLING_FLAG;
+	g_pstI2Cclient2->timing = 100;	/* 100k */
+	g_pstI2Cclient2->ext_flag &= ~I2C_POLLING_FLAG;
 #endif
 
 	/* Default EEPROM Slave Address sub = 0xa8 */
-	g_pstI2Cclients[I2C_DEV_IDX_2]->addr = 0x54;
+	g_pstI2Cclient2->addr = 0x54;
 	spin_unlock(&g_spinLock);
 
 	return 0;
@@ -533,16 +288,16 @@ static int EEPROM_HW_i2c_probe3
 {
 	/* get sensor i2c client */
 	spin_lock(&g_spinLock);
-	g_pstI2Cclients[I2C_DEV_IDX_3] = client;
+	g_pstI2Cclient3 = client;
 
 	/* set I2C clock rate */
 #ifdef CONFIG_MTK_I2C_EXTENSION
-	g_pstI2Cclients[I2C_DEV_IDX_3]->timing = gi2c_dev_timing[I2C_DEV_IDX_3];
-	g_pstI2Cclients[I2C_DEV_IDX_3]->ext_flag &= ~I2C_POLLING_FLAG;
+	g_pstI2Cclient3->timing = 100;	/* 100k */
+	g_pstI2Cclient3->ext_flag &= ~I2C_POLLING_FLAG;
 #endif
 
 	/* Default EEPROM Slave Address Main2 = 0xa4 */
-	g_pstI2Cclients[I2C_DEV_IDX_3]->addr = 0x52;
+	g_pstI2Cclient3->addr = 0x52;
 	spin_unlock(&g_spinLock);
 
 	return 0;
@@ -819,8 +574,7 @@ static long EEPROM_drv_ioctl(struct file *file,
 		pBuff = kmalloc(sizeof(struct stCAM_CAL_INFO_STRUCT),
 					GFP_KERNEL);
 		if (pBuff == NULL) {
-
-			pr_debug("ioctl allocate pBuff mem failed\n");
+			pr_debug(" ioctl allocate pBuff mem failed\n");
 			return -ENOMEM;
 		}
 
@@ -871,31 +625,18 @@ static long EEPROM_drv_ioctl(struct file *file,
 		do_gettimeofday(&ktv1);
 #endif
 
-		pcmdInf = EEPROM_get_cmd_info_ex(ptempbuf->sensorID,
-			ptempbuf->deviceID);
-
-		/* Check the max size if specified */
-		if (pcmdInf != NULL &&
-		    (pcmdInf->maxEepromSize != 0) &&
-		    (pcmdInf->maxEepromSize <
-		     (ptempbuf->u4Offset + ptempbuf->u4Length))) {
-			pr_debug("Error!! not support address >= 0x%x!!\n",
-				 pcmdInf->maxEepromSize);
-			kfree(pBuff);
-			kfree(pu1Params);
-			return -EFAULT;
-		}
-
-		if (pcmdInf != NULL && g_lastDevID != ptempbuf->deviceID) {
-			if (EEPROM_set_i2c_bus(ptempbuf->deviceID,
-					       pcmdInf) != 0) {
+		if (g_lastDevID != ptempbuf->deviceID) {
+			g_lastDevID = ptempbuf->deviceID;
+			if (EEPROM_set_i2c_bus(ptempbuf->deviceID) != 0) {
 				pr_debug("deviceID Error!\n");
 				kfree(pBuff);
 				kfree(pu1Params);
 				return -EFAULT;
 			}
-			g_lastDevID = ptempbuf->deviceID;
 		}
+
+		pcmdInf = EEPROM_get_cmd_info_ex(ptempbuf->sensorID,
+			ptempbuf->deviceID);
 
 		if (pcmdInf != NULL) {
 			if (pcmdInf->writeCMDFunc != NULL) {
@@ -929,119 +670,21 @@ static long EEPROM_drv_ioctl(struct file *file,
 		do_gettimeofday(&ktv1);
 #endif
 
+		if (g_lastDevID != ptempbuf->deviceID) {
+			g_lastDevID = ptempbuf->deviceID;
+			if (EEPROM_set_i2c_bus(ptempbuf->deviceID) != 0) {
+				pr_debug("deviceID Error!\n");
+				kfree(pBuff);
+				kfree(pu1Params);
+				return -EFAULT;
+			}
+		}
 		pr_debug("SensorID=%x DeviceID=%x\n",
 			ptempbuf->sensorID, ptempbuf->deviceID);
 		pcmdInf = EEPROM_get_cmd_info_ex(
 			ptempbuf->sensorID,
 			ptempbuf->deviceID);
 
-		/* Check the max size if specified */
-		if (pcmdInf != NULL &&
-		    (pcmdInf->maxEepromSize != 0) &&
-		    (pcmdInf->maxEepromSize <
-		     (ptempbuf->u4Offset + ptempbuf->u4Length))) {
-			pr_debug("Error!! not support address >= 0x%x!!\n",
-				 pcmdInf->maxEepromSize);
-			kfree(pBuff);
-			kfree(pu1Params);
-			return -EFAULT;
-		}
-
-		if (pcmdInf != NULL && g_lastDevID != ptempbuf->deviceID) {
-			if (EEPROM_set_i2c_bus(ptempbuf->deviceID,
-					       pcmdInf) != 0) {
-				pr_debug("deviceID Error!\n");
-				kfree(pBuff);
-				kfree(pu1Params);
-				return -EFAULT;
-			}
-			g_lastDevID = ptempbuf->deviceID;
-		}
-
-#ifdef ODM_WT_EDIT
-		/* Zhen.Quan@Camera.Driver, 2019/10/17, add for [otp bringup] */
-		PK_INF("SensorID=%x DeviceID=%x\n", ptempbuf->sensorID, ptempbuf->deviceID);
-		PK_INF("u4Offset=%x u4Length=%x\n", ptempbuf->u4Offset, ptempbuf->u4Length);
-		if((ptempbuf->deviceID == 0x01)&&(g_eepromMainData != NULL)){
-			u32 totalLength = ptempbuf->u4Offset+ ptempbuf->u4Length;
-			PK_DBG("read in main\n");
-			if((g_eepromMainData->dataBuffer)&&(totalLength <= g_eepromMainData->dataLength)){
-				if(ptempbuf->u4Offset == 0){
-					PK_INF("SensorID=%x DeviceID=%x\n", ptempbuf->sensorID, ptempbuf->deviceID);
-					memcpy(pu1Params,(u8*)&g_eepromMainData->sensorVendorid,4);
-				}else
-				  memcpy(pu1Params,g_eepromMainData->dataBuffer+ptempbuf->u4Offset,ptempbuf->u4Length);
-				i4RetValue = ptempbuf->u4Length;
-			}
-			else
-				PK_ERR("maybe some error buf(%p)read(%d)have(%d) \n",g_eepromMainData->dataBuffer,totalLength,g_eepromMainData->dataLength);
-		}
-		else if((ptempbuf->deviceID == 0x02)&&(g_eepromSubData != NULL)){
-			u32 totalLength = ptempbuf->u4Offset+ ptempbuf->u4Length;
-			if((g_eepromSubData->dataBuffer)&&(totalLength <= g_eepromSubData->dataLength)){
-				PK_DBG("read in sub\n");
-				if(ptempbuf->u4Offset == 0){
-					memcpy(pu1Params,(u8*)&g_eepromSubData->sensorVendorid,4);
-				}else
-					memcpy(pu1Params,g_eepromSubData->dataBuffer+ptempbuf->u4Offset,ptempbuf->u4Length);
-				i4RetValue = ptempbuf->u4Length;
-			}
-			else
-				PK_ERR("maybe some error buf(%p)read(%d)have(%d) \n",g_eepromSubData->dataBuffer,totalLength,g_eepromSubData->dataLength);
-		}
-		else if((ptempbuf->deviceID == 0x04)&&(g_eepromMain2Data != NULL)){
-			u32 totalLength = ptempbuf->u4Offset+ ptempbuf->u4Length;
-			PK_DBG("read in main2\n");
-			if((g_eepromMain2Data->dataBuffer)&&(totalLength <= g_eepromMain2Data->dataLength)){
-				if(ptempbuf->u4Offset == 0){
-					memcpy(pu1Params,(u8*)&g_eepromMain2Data->sensorVendorid,4);
-				}else
-					memcpy(pu1Params,g_eepromMain2Data->dataBuffer+ptempbuf->u4Offset,ptempbuf->u4Length);
-				i4RetValue = ptempbuf->u4Length;
-			}else
-				PK_ERR("maybe some error buf(%p)read(%d)have(%d) \n",g_eepromMain2Data->dataBuffer,totalLength,g_eepromMain2Data->dataLength);
-		}
-		else if((ptempbuf->deviceID == 0x08)&&(g_eepromSub2Data != NULL)){
-			u32 totalLength = ptempbuf->u4Offset+ ptempbuf->u4Length;
-			PK_DBG("read in sub2\n");
-			if((g_eepromSub2Data->dataBuffer)&&(totalLength <= g_eepromSub2Data->dataLength)){
-				if(ptempbuf->u4Offset == 0){
-					memcpy(pu1Params,(u8*)&g_eepromSub2Data->sensorVendorid,4);
-				}else
-					memcpy(pu1Params,g_eepromSub2Data->dataBuffer+ptempbuf->u4Offset,ptempbuf->u4Length);
-				i4RetValue = ptempbuf->u4Length;
-			}else
-				PK_ERR("maybe some error buf(%p)read(%d)have(%d) \n",g_eepromSub2Data->dataBuffer,totalLength,g_eepromSub2Data->dataLength);
-		}
-		else if((ptempbuf->deviceID == 0x10)&&(g_eepromMain3Data != NULL)){
-			u32 totalLength = ptempbuf->u4Offset+ ptempbuf->u4Length;
-			PK_DBG("read in main3\n");
-			if((g_eepromMain3Data->dataBuffer)&&(totalLength <= g_eepromMain3Data->dataLength)){
-				if(ptempbuf->u4Offset == 0){
-					memcpy(pu1Params,(u8*)&g_eepromMain3Data->sensorVendorid,4);
-				}else
-					memcpy(pu1Params,g_eepromMain3Data->dataBuffer+ptempbuf->u4Offset,ptempbuf->u4Length);
-				i4RetValue = ptempbuf->u4Length;
-			}else
-				PK_ERR("maybe some error buf(%p)read(%d)have(%d) \n",g_eepromMain3Data->dataBuffer,totalLength,g_eepromMain3Data->dataLength);
-		}else{
-		   pcmdInf = EEPROM_get_cmd_info_ex(
-		   ptempbuf->sensorID,
-		   ptempbuf->deviceID);
-			if (pcmdInf != NULL) {
-				if (pcmdInf->readCMDFunc != NULL){
-					i4RetValue =
-						pcmdInf->readCMDFunc(pcmdInf->client,
-								  ptempbuf->u4Offset,
-								  pu1Params,
-								  ptempbuf->u4Length);
-					}
-				else {
-					PK_DBG("pcmdInf->readCMDFunc == NULL\n");
-				}
-			}
-		}
-#else
 		if (pcmdInf != NULL) {
 			if (pcmdInf->readCMDFunc != NULL)
 				i4RetValue =
@@ -1056,7 +699,6 @@ static long EEPROM_drv_ioctl(struct file *file,
 				return -EFAULT;
 			}
 		}
-#endif
 #ifdef CAM_CALGETDLT_DEBUG
 		do_gettimeofday(&ktv2);
 		if (ktv2.tv_sec > ktv1.tv_sec)
@@ -1095,7 +737,7 @@ static int EEPROM_drv_open(struct inode *a_pstInode, struct file *a_pstFile)
 {
 	int ret = 0;
 
-	pr_debug("%s start\n", __func__);
+	pr_debug("EEPROM_drv_open start\n");
 	spin_lock(&g_spinLock);
 	if (g_drvOpened) {
 		spin_unlock(&g_spinLock);
@@ -1203,7 +845,7 @@ static void EEPROM_chrdev_unregister(void)
 
 static int __init EEPROM_drv_init(void)
 {
-	pr_debug("%s Start!\n", __func__);
+	pr_debug("EEPROM_drv_init Start!\n");
 
 	if (platform_driver_register(&g_stEEPROM_HW_Driver)) {
 		pr_debug("failed to register EEPROM driver i2C main\n");
@@ -1217,7 +859,7 @@ static int __init EEPROM_drv_init(void)
 
 	EEPROM_chrdev_register();
 
-	pr_debug("%s End!\n", __func__);
+	pr_debug("EEPROM_drv_init End!\n");
 	return 0;
 }
 

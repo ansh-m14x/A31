@@ -108,7 +108,7 @@ typedef struct
     int  (* readFunc) (u8 page,u16 addr, u8 *data);
 }OTP_MAP;
 
-char read_module_id(void);
+
 int s5k4h7yx_read_data(u8 page,u16 addr,u8 *data);
 
 
@@ -472,14 +472,7 @@ static int parse_otp_map_data(OTP_MAP * map,char * data)
 }
 
 
-char read_module_id(void)
-{
-    char module_id = 0;
-    g_pstI2CclientG = g_pstI2Cclients[CAM_CAL_SENSOR_IDX_SUB];
-    g_pstI2CclientG->addr = 0x20 >> 1;
-    s5k4h7yx_read_data(21,0x0A04,&module_id);
-    return module_id;
-}
+
 
 
 
@@ -501,16 +494,13 @@ int s5k4h7yx_read_data(u8 page,u16 addr,u8 *data)
     return ret;
 }
 
-unsigned int s5k4h7yx_read_region(struct i2c_client *client, unsigned int addr,unsigned char *data,unsigned int size)
+unsigned int s5k4h7yx_hlt_read_region(struct i2c_client *client, unsigned int addr,unsigned char *data,unsigned int size)
 {
     int ret = 0;
-	// yinlili@ODM_HQ Cam.Algo  20200225 modified for coverity issue:67597
-	unsigned int reg_addr=0;
-	reg_addr = addr;
-    LOG_DEBUG("s5k4h7yx_read_region addr:0x%x, size:%d", reg_addr, size);
+    LOG_DEBUG("s5k4h7yx_hlt_read_region addr:0x%x, size:%d", addr, size);
     if(NULL != data && g_otp_buf[CAM_CAL_SENSOR_IDX_SUB][READ_FLAG_ADDR] ){
-        LOG_INFO("from mem addr 0x%x,size %d",reg_addr,size);
-        memcpy((void *)data, &g_otp_buf[CAM_CAL_SENSOR_IDX_SUB][reg_addr],size);
+        LOG_INFO("from mem addr 0x%x,size %d",addr,size);
+        memcpy((void *)data, &g_otp_buf[CAM_CAL_SENSOR_IDX_SUB][addr],size);
         return size;
     }
     if(client != NULL){
@@ -523,7 +513,7 @@ unsigned int s5k4h7yx_read_region(struct i2c_client *client, unsigned int addr,u
 
         g_pstI2CclientG->addr = 0x20 >> 1;
     } else {
-        LOG_ERR("s5k4h7yx_read_region no client.");
+        LOG_ERR("s5k4h7yx_hlt_read_region no client.");
         return -1;
     }
     ret = parse_otp_map_data(&s5k4h7yx_hlt_otp_map, &g_otp_buf[CAM_CAL_SENSOR_IDX_SUB][0]);
