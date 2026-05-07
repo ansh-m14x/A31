@@ -1,4 +1,3 @@
-#
 # Copyright (C) 2015 MediaTek Inc.
 #
 # This program is free software: you can redistribute it and/or modify
@@ -15,13 +14,14 @@ subdir-ccflags-y += -I$(srctree)/drivers/i2c/busses/ \
              -I$(srctree)/drivers/misc/mediatek/ccu/inc \
              -I$(srctree)/drivers/misc/hqdevinfo
 
-MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
-ARCH_MTK_PROJECT := $(subst ",,$(CONFIG_ARCH_MTK_PROJECT))
+# Force override variables for Oppo A31 (19581) to bypass multi-chipset conflicts
+MTK_PLATFORM       := mt6765
+ARCH_MTK_PROJECT   := oppo6765_19581
 
 MTK_PLATFORM_PATH_ROOT := $(srctree)/drivers/misc/mediatek/mach/$(MTK_PLATFORM)
-MTK_PROJECT_PATH_ROOT := $(srctree)/drivers/misc/mediatek/mach/$(MTK_PLATFORM)/$(ARCH_MTK_PROJECT)
+MTK_PROJECT_PATH_ROOT  := $(srctree)/drivers/misc/mediatek/mach/$(MTK_PLATFORM)/$(ARCH_MTK_PROJECT)
 
-CONFIG_MTK_PLATFORM_SENSOR := $(CONFIG_MTK_PLATFORM)
+CONFIG_MTK_PLATFORM_SENSOR := mt6765
 
 subdir-ccflags-y += -I$(MTK_PROJECT_PATH_ROOT)/camera/camera
 
@@ -40,5 +40,5 @@ CUSTOM_KERNEL_FLAGS := $(addprefix -D, $(shell echo \
              $(CONFIG_CUSTOM_KERNEL_IMGSENSOR) | tr a-z A-Z))
 subdir-ccflags-y += $(CUSTOM_KERNEL_FLAGS)
 
-obj-y += $(subst ",,$(CONFIG_MTK_PLATFORM_SENSOR))/
-
+# Force compilation exclusively down the mt6765 hardware path 
+obj-y += mt6765/
