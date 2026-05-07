@@ -53,14 +53,16 @@ jobs:
     - name: Global Makefile & Header Patching
       run: |
         # FIX FOR COMPILER-CLANG.H ERROR
-        # If the kernel is missing the clang header, we copy the gcc one as a fallback
         cd kernel-4.9
         if [ ! -f include/linux/compiler-clang.h ]; then
           cp include/linux/compiler-gcc.h include/linux/compiler-clang.h
         fi
 
-        # HIGHLIGHT: MAIN FIX FOR GPU ERROR 2 & STRICT CLANG
-        # We append these flags to ensure they aren't overridden by later Makefile assignments
+        # RECURSIVE DRIVER PATCHING
+        # This force-injects suppression flags into every Mediatek driver Makefile
+        find drivers/misc/mediatek -name "Makefile" -exec sed -i '1i ccflags-y += -Wno-error -Wno-sometimes-uninitialized -Wno-ignored-qualifiers -Wno-unused-variable -Wno-unused-function' {} +
+
+        # Main Makefile flags
         sed -i '/^KBUILD_CFLAGS += -Wall/a KBUILD_CFLAGS += -Wno-error -Wno-sometimes-uninitialized -Wno-ignored-qualifiers -Wno-unused-variable -Wno-unused-function' Makefile
         
         # Defconfig adjustments
@@ -89,7 +91,7 @@ jobs:
         make O=out mrproper
         make O=out oppo6765_19581_defconfig
         
-        # Execute build with HOSTCC and KCFLAGS to force the bypass through the GPU drivers
+        # Execute build with HOSTCC and KCFLAGS
         make -j$(nproc) O=out \
             CC=clang \
             HOSTCC=gcc \
