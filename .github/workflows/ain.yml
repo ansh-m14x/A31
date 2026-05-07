@@ -79,13 +79,6 @@ jobs:
         make O=out mrproper
         make O=out oppo6765_19581_defconfig
         make -j$(nproc) O=out CC=clang CLANG_TRIPLE=$CLANG_TRIPLE CROSS_COMPILE=$CROSS_COMPILE CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 Image.gz-dtb
-            
-              - name: Check for Fatal Errors
-        if: failure()
-        run: |
-          echo "Searching for the cause of failure..."
-          grep -iA 20 -B 20 "error:" build.log || echo "No specific error found in build.log"
-          grep -i "multiple definition of" build.log || true
 
 
     - name: Upload Build
