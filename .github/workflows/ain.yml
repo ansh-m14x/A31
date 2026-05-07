@@ -59,8 +59,9 @@ jobs:
         fi
 
         # RECURSIVE DRIVER PATCHING
-        # This force-injects suppression flags into every Mediatek driver Makefile
+        # Force-inject suppression flags and ensure camera drivers can see both imgsensor and cam_cal headers
         find drivers/misc/mediatek -name "Makefile" -exec sed -i '1i ccflags-y += -Wno-error -Wno-sometimes-uninitialized -Wno-ignored-qualifiers -Wno-unused-variable -Wno-unused-function' {} +
+        find drivers/misc/mediatek/cam_cal -name "Makefile" -exec sed -i '1i ccflags-y += -I$(srctree)/drivers/misc/mediatek/imgsensor/inc -I$(srctree)/drivers/misc/mediatek/cam_cal/inc' {} +
 
         # Main Makefile flags
         sed -i '/^KBUILD_CFLAGS += -Wall/a KBUILD_CFLAGS += -Wno-error -Wno-sometimes-uninitialized -Wno-ignored-qualifiers -Wno-unused-variable -Wno-unused-function' Makefile
@@ -91,7 +92,7 @@ jobs:
         make O=out mrproper
         make O=out oppo6765_19581_defconfig
         
-        # Execute build with HOSTCC and KCFLAGS
+        # Execute build with HOSTCC and KCFLAGS (Added -w to suppress all driver warnings)
         make -j$(nproc) O=out \
             CC=clang \
             HOSTCC=gcc \
