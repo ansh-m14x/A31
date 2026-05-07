@@ -50,14 +50,21 @@ jobs:
         rm -rf temp_kaga
         find kernel-4.9 -path kernel-4.9/drivers/misc/mediatek/connectivity -prune -o -type f \( -name "*.c" -o -name "*.h" \) -exec sed -i 's|<soc/qcom/|<linux/soc/qcom/|g' {} +
 
-    - name: Global Makefile Patching
+    - name: Global Makefile & Header Patching
       run: |
-        # HIGHLIGHT: MAIN FIX FOR GPU ERROR 2
-        # Force-injecting bypass flags into the main KBUILD_CFLAGS
-        sed -i 's/^KBUILD_CFLAGS += -Wall/KBUILD_CFLAGS += -Wall -Wno-error -Wno-sometimes-uninitialized -Wno-ignored-qualifiers -Wno-unused-variable -Wno-unused-function/g' kernel-4.9/Makefile
+        # FIX FOR COMPILER-CLANG.H ERROR
+        # If the kernel is missing the clang header, we copy the gcc one as a fallback
+        cd kernel-4.9
+        if [ ! -f include/linux/compiler-clang.h ]; then
+          cp include/linux/compiler-gcc.h include/linux/compiler-clang.h
+        fi
+
+        # HIGHLIGHT: MAIN FIX FOR GPU ERROR 2 & STRICT CLANG
+        # We append these flags to ensure they aren't overridden by later Makefile assignments
+        sed -i '/^KBUILD_CFLAGS += -Wall/a KBUILD_CFLAGS += -Wno-error -Wno-sometimes-uninitialized -Wno-ignored-qualifiers -Wno-unused-variable -Wno-unused-function' Makefile
         
         # Defconfig adjustments
-        DEFCONFIG="kernel-4.9/arch/arm64/configs/oppo6765_19581_defconfig"
+        DEFCONFIG="arch/arm64/configs/oppo6765_19581_defconfig"
         sed -i 's/CONFIG_MTK_FLASHLIGHT_MT6370=n/CONFIG_MTK_FLASHLIGHT_MT6370=y/g' $DEFCONFIG
         sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-ansh_m14x"/g' $DEFCONFIG
 
@@ -82,9 +89,11 @@ jobs:
         make O=out mrproper
         make O=out oppo6765_19581_defconfig
         
-        # Execute build with KCFLAGS warning suppression
+        # Execute build with HOSTCC and KCFLAGS to force the bypass through the GPU drivers
         make -j$(nproc) O=out \
             CC=clang \
+            HOSTCC=gcc \
+            HOSTCXX=g++ \
             CLANG_TRIPLE=$CLANG_TRIPLE \
             CROSS_COMPILE=$CROSS_COMPILE \
             CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
