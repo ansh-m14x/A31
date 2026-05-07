@@ -99,7 +99,7 @@ jobs:
             CLANG_TRIPLE=$CLANG_TRIPLE \
             CROSS_COMPILE=$CROSS_COMPILE \
             CROSS_COMPILE_ARM32=$CROSS_COMPILE_ARM32 \
-            KCFLAGS="-Wno-error -Wno-sometimes-uninitialized -Wno-ignored-qualifiers" \
+            KCFLAGS="-w -Wno-error -Wno-sometimes-uninitialized -Wno-ignored-qualifiers" \
             Image.gz-dtb
 
     - name: Upload Artifact
