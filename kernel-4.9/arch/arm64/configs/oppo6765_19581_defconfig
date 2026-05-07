@@ -502,3 +502,15 @@ CONFIG_OPPO_KTV_DEV=y
 CONFIG_ELSA_STUB=y
 CONFIG_CRYPTO_ZSTD=y
 CONFIG_CRYPTO_MANAGER2=y
+# Force manual sensor selection for Oppo A31 (19581)
+CONFIG_SPECIFY_IMGSENSOR=y
+
+# Main 12MP Camera (Sony IMX386)
+CONFIG_IMGSENSOR_MAIN="imx386_mipi_raw"
+
+# Front 8MP Selfie Camera (Hynix Hi-846)
+CONFIG_IMGSENSOR_SUB="hi846_mipi_raw"
+
+# Secondary 2MP Macro/Depth (OmniVision or GalaxyCore)
+CONFIG_IMGSENSOR_MAIN2="ov02a10_mipi_raw"
+CONFIG_IMGSENSOR_SUB2="gc2375_mipi_raw"
