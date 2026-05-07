@@ -1,40 +1,30 @@
-#
 # Copyright (C) 2017 MediaTek Inc.
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License version 2 as
-# published by the Free Software Foundation.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU General Public License for more details.
-#
+# Fixed for Oppo A31 Deep Folder Structure
 
-#
-# Makefile for misc devices that really don't fit anywhere else.
-#
+MTK_PLATFORM := mt6765
+ARCH_MTK_PROJECT := oppo6765_19581
+IMGSENSOR_DRIVER_PATH := $(srctree)/drivers/misc/mediatek/imgsensor/src
 
-MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
-ARCH_MTK_PROJECT := $(subst ",,$(CONFIG_ARCH_MTK_PROJECT))
-IMGSENSOR_DRIVER_PATH  := $(srctree)/drivers/misc/mediatek/imgsensor/src
+# Link Camera Hardware
+obj-y += camera_hw/
 
-define FILTER_PROJECT_DRV
-ifneq ($(wildcard $(IMGSENSOR_DRIVER_PATH)/$(MTK_PLATFORM)/camera_project/$(ARCH_MTK_PROJECT)/$(1)),)
-project_drv += $(1)/
+# Custom Filter to look into subfolders
+define FILTER_DEEP_DRV
+ifneq ($(wildcard $(IMGSENSOR_DRIVER_PATH)/$(MTK_PLATFORM)/camera_project/$(ARCH_MTK_PROJECT)/back/$(1)),)
+  project_drv += back/$(1)/
+endif
+ifneq ($(wildcard $(IMGSENSOR_DRIVER_PATH)/$(MTK_PLATFORM)/camera_project/$(ARCH_MTK_PROJECT)/front/$(1)),)
+  project_drv += front/$(1)/
+endif
+ifneq ($(wildcard $(IMGSENSOR_DRIVER_PATH)/$(MTK_PLATFORM)/camera_project/$(ARCH_MTK_PROJECT)/back_aux/$(1)),)
+  project_drv += back_aux/$(1)/
 endif
 endef
 
-
-
-ifneq ($(wildcard $(IMGSENSOR_DRIVER_PATH)/$(MTK_PLATFORM)/camera_project/$(ARCH_MTK_PROJECT)/camera_hw),)
-obj-y += camera_hw/
-endif
-
-$(foreach drv,$(subst $\",,$(CONFIG_CUSTOM_KERNEL_IMGSENSOR)),$(eval $(call FILTER_PROJECT_DRV,$(drv))))
+$(foreach drv,$(subst $\",,$(CONFIG_CUSTOM_KERNEL_IMGSENSOR)),$(eval $(call FILTER_DEEP_DRV,$(drv))))
 
 obj-y += $(project_drv)
 
 ifneq ($(project_drv),)
-$(info imgsensor drv by project $(project_drv))
+$(info imgsensor drv by project deep-search: $(project_drv))
 endif
