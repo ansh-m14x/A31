@@ -164,7 +164,6 @@
 #define OV13850_SENSOR_ID                       0xD850
 #define OV12A10_SENSOR_ID                       0x1241
 #define OV12A10_ST_SENSOR_ID                    0x1242
-#define OV12A10_QTECH_SENSOR_ID                 0x1243
 #define OV13870_SENSOR_ID                       0x013870
 #define OV13850_SENSOR_ID                       0xD850
 #define OV13855_SENSOR_ID                       0xD855
@@ -400,7 +399,6 @@
 #define SENSOR_DRVNAME_OV13850_MIPI_RAW         "ov13850_mipi_raw"
 #define SENSOR_DRVNAME_OV12A10_MIPI_RAW         "ov12a10_mipi_raw"
 #define SENSOR_DRVNAME_OV12A10_ST_MIPI_RAW      "ov12a10_st_mipi_raw"
-#define SENSOR_DRVNAME_OV12A10_QTECH_MIPI_RAW   "ov12a10_qtech_mipi_raw"
 #define SENSOR_DRVNAME_OV12830_MIPI_RAW         "ov12830_mipi_raw"
 #define SENSOR_DRVNAME_OV9760_MIPI_RAW          "ov9760_mipi_raw"
 #define SENSOR_DRVNAME_OV9740_MIPI_YUV          "ov9740_mipi_yuv"
@@ -537,18 +535,45 @@
 #define SENSOR_DRVNAME_OV8856_MIPI_RAW_5MP      "ov8856_mipi_raw_5mp"
 /*Bacon cam begin*/
 #define GC2375H_SENSOR_ID                        0x2375
-#define GC2385_SENSOR_ID                        0x2385
 #define S5K4H7YX_HLT_SENSOR_ID                   0x487b
-#define S5K4H7YX_ST_SENSOR_ID                   0x487c
 #define GC02M0_SENSOR_ID                         0x02d0
 #define GC2385_BW_SENSOR_ID                        0x2386
 #define SENSOR_DRVNAME_GC2375H_MIPI_RAW            "gc2375h_mipi_raw"
-#define SENSOR_DRVNAME_GC2385_MIPI_RAW            "gc2385_mipi_raw"
 #define SENSOR_DRVNAME_S5K4H7YX_HLT_MIPI_RAW       "s5k4h7yx_hlt_mipi_raw"
-#define SENSOR_DRVNAME_S5K4H7YX_ST_MIPI_RAW       "s5k4h7yx_st_mipi_raw"
 #define SENSOR_DRVNAME_GC02M0_MIPI_RAW             "gc02m0_mipi_raw"
 #define SENSOR_DRVNAME_GC2385_BW_MIPI_RAW            "gc2385_bw_mipi_raw"
 /*Bacon cam end*/
+
+#ifdef ODM_WT_EDIT
+/* Cola Project */
+/* 1.First Vendor */
+#define HI1336_SENSOR_ID                        0x1336
+#define GC2375H_CHENGXIANGTONG_SENSOR_ID        0x2376
+#define GC5035_HOLITECH_SENSOR_ID               (0x5035 + 1)
+/* 2.Second Vendor */
+#define HI556_LCE_SENSOR_ID                     0x0556
+#define GC02M1B_CXT_SENSOR_ID                   0x02e0
+#define HI1336_HOLITECH_SENSOR_ID               0x1337
+/* 3.Third Vendor */
+#define HI1336_HAOZE_SENSOR_ID                  0x1338
+#define GC2385_SENSOR_ID                        0x2385
+#define GC5035_B_SENSOR_ID                      (0x5035 + 2)
+
+/* 1.First Vendor */
+#define SENSOR_DRVNAME_HI1336_MIPI_RAW                         "hi1336_mipi_raw"
+#define SENSOR_DRVNAME_GC2375H_CHENGXIANGTONG_MIPI_RAW         "gc2375h_chengxiangtong_mipi_raw"
+#define SENSOR_DRVNAME_GC5035_HOLITECH_MIPI_RAW                "gc5035_holitech_mipi_raw"
+/* 2.Second Vendor */
+#define SENSOR_DRVNAME_HI556_LCE_MIPI_RAW                      "hi556_lce_mipi_raw"
+#define SENSOR_DRVNAME_GC02M1B_CXT_MIPI_RAW                    "gc02m1b_cxt_mipi_raw"
+#define SENSOR_DRVNAME_HI1336_HOLITECH_MIPI_RAW                "hi1336_holitech_mipi_raw"
+/* 3.Third Vendor */
+#define SENSOR_DRVNAME_HI1336_HAOZE_MIPI_RAW                   "hi1336_haoze_mipi_raw"
+#define SENSOR_DRVNAME_GC2385_MIPI_RAW                         "gc2385_mipi_raw"
+#define SENSOR_DRVNAME_GC5035_B_MIPI_RAW                       "gc5035_b_mipi_raw"
+/* Cola end */
+#endif
+
 #define mDELAY(ms)     mdelay(ms)
 #define uDELAY(us)       udelay(us)
 #endif              /* _KD_IMGSENSOR_H */

@@ -23,6 +23,59 @@
  *     mediatek\custom\common\hal\imgsensor\src\sensorlist.cpp
  */
 struct IMGSENSOR_INIT_FUNC_LIST kdSensorList[MAX_NUM_OF_SUPPORT_SENSOR] = {
+#ifdef ODM_WT_EDIT
+/* Cola Project */
+/* 1.First Vendor */
+#if defined(HI1336_MIPI_RAW)
+		{HI1336_SENSOR_ID,
+		SENSOR_DRVNAME_HI1336_MIPI_RAW,
+		HI1336_MIPI_RAW_SensorInit},
+#endif
+#if defined(GC2375H_CHENGXIANGTONG_MIPI_RAW)
+		{GC2375H_CHENGXIANGTONG_SENSOR_ID,
+		SENSOR_DRVNAME_GC2375H_CHENGXIANGTONG_MIPI_RAW,
+		GC2375H_CHENGXIANGTONG_MIPI_RAW_SensorInit},
+#endif
+#if defined(GC5035_HOLITECH_MIPI_RAW)
+                {GC5035_HOLITECH_SENSOR_ID,
+                SENSOR_DRVNAME_GC5035_HOLITECH_MIPI_RAW,
+                GC5035_HOLITECH_MIPI_RAW_SensorInit},
+#endif
+/* 2.Second Vendor */
+#if defined(HI556_LCE_MIPI_RAW)
+                {HI556_LCE_SENSOR_ID,
+                SENSOR_DRVNAME_HI556_LCE_MIPI_RAW,
+                HI556_LCE_MIPI_RAW_SensorInit},
+#endif
+#if defined(GC02M1B_CXT_MIPI_RAW)
+                {GC02M1B_CXT_SENSOR_ID,
+                SENSOR_DRVNAME_GC02M1B_CXT_MIPI_RAW,
+                GC02M1B_CXT_MIPI_RAW_SensorInit},
+#endif
+#if defined(HI1336_HOLITECH_MIPI_RAW)
+		{HI1336_HOLITECH_SENSOR_ID,
+		SENSOR_DRVNAME_HI1336_HOLITECH_MIPI_RAW,
+		HI1336_HOLITECH_MIPI_RAW_SensorInit},
+#endif
+/* 3.Third Vendor */
+#if defined(HI1336_HAOZE_MIPI_RAW)
+		{HI1336_HAOZE_SENSOR_ID,
+		SENSOR_DRVNAME_HI1336_HAOZE_MIPI_RAW,
+		HI1336_HAOZE_MIPI_RAW_SensorInit},
+#endif
+#if defined(GC2385_MIPI_RAW)
+	{GC2385_SENSOR_ID,
+	SENSOR_DRVNAME_GC2385_MIPI_RAW,
+	GC2385_MIPI_RAW_SensorInit},
+#endif
+#if defined(GC5035_B_MIPI_RAW)
+                {GC5035_B_SENSOR_ID,
+                SENSOR_DRVNAME_GC5035_B_MIPI_RAW,
+                GC5035_B_MIPI_RAW_SensorInit},
+#endif
+/* Cola Camera End */
+#endif
+
 	/*IMX*/
 #if defined(IMX499_MIPI_RAW)
 		{IMX499_SENSOR_ID,
@@ -700,20 +753,10 @@ struct IMGSENSOR_INIT_FUNC_LIST kdSensorList[MAX_NUM_OF_SUPPORT_SENSOR] = {
 	SENSOR_DRVNAME_OV12A10_ST_MIPI_RAW,
 	OV12A10_ST_MIPI_RAW_SensorInit},
 #endif
-#if defined(OV12A10_QTECH_MIPI_RAW)
-	{OV12A10_QTECH_SENSOR_ID,
-	SENSOR_DRVNAME_OV12A10_QTECH_MIPI_RAW,
-	OV12A10_QTECH_MIPI_RAW_SensorInit},
-#endif
 #if defined(S5K4H7YX_HLT_MIPI_RAW)
 	{S5K4H7YX_HLT_SENSOR_ID,
 	SENSOR_DRVNAME_S5K4H7YX_HLT_MIPI_RAW,
 	S5K4H7YX_HLT_MIPI_RAW_SensorInit},
-#endif
-#if defined(S5K4H7YX_ST_MIPI_RAW)
-	{S5K4H7YX_ST_SENSOR_ID,
-	SENSOR_DRVNAME_S5K4H7YX_ST_MIPI_RAW,
-	S5K4H7YX_ST_MIPI_RAW_SensorInit},
 #endif
 #if defined(GC02M0_MIPI_RAW)
 	{GC02M0_SENSOR_ID,
@@ -729,11 +772,6 @@ struct IMGSENSOR_INIT_FUNC_LIST kdSensorList[MAX_NUM_OF_SUPPORT_SENSOR] = {
 	{GC2375H_SENSOR_ID,
 	SENSOR_DRVNAME_GC2375H_MIPI_RAW,
 	GC2375H_MIPI_RAW_SensorInit},
-#endif
-#if defined(GC2385_MIPI_RAW)
-	{GC2385_SENSOR_ID,
-	SENSOR_DRVNAME_GC2385_MIPI_RAW,
-	GC2385_MIPI_RAW_SensorInit},
 #endif
 /*Bacon cam end*/
 	/*  ADD sensor driver before this line */

@@ -247,7 +247,7 @@ static struct SET_PD_BLOCK_INFO_T imgsensor_pd_info = {
 	 .i4BlockNumY = 96,
 	 .i4PosL = {{10,2},{26,2},{2,14},{18,14},{10,18},{26,18},{2,30},{18,30},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0}},
 	 .i4PosR = {{10,6},{26,6},{2,10},{18,10},{10,22},{26,22},{2,26},{18,26},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0}},
-	 .i4Crop = {{0,0},{0,0},{0,384},{0,0},{0,0},{0,0},{416,312},{0,0}, {0,0}, {0,0}},
+	 .i4Crop = {{0,0},{0,0},{0,384},{0,0},{0,0},{0,0},{0,0},{0,0}, {0,0}, {0,0}},
 	 .iMirrorFlip = IMAGE_NORMAL,
 };
 #if MULTI_WRITE
@@ -1763,8 +1763,8 @@ kal_uint16 addr_data_pair_custom2_24fps_ov12a10_st[] = {
 	0x380e, 0x10,
 	0x380f, 0x85,
 	0x3810, 0x01,
-	0x3811, 0xa8,
-	0x3813, 0x3a,
+	0x3811, 0xaa,
+	0x3813, 0x38,
 	0x3814, 0x01,
 	0x3816, 0x01,
 	0x3820, 0xb0,
@@ -2559,9 +2559,7 @@ static kal_uint32 feature_control(
 	struct SET_PD_BLOCK_INFO_T *PDAFinfo;
 
 	if (!((feature_id == 3040) || (feature_id == 3058)))
-	{
 		LOG_INF("feature_id = %d\n", feature_id);
-	}
 
 	switch (feature_id) {
 	case SENSOR_FEATURE_GET_PERIOD:
@@ -2705,13 +2703,7 @@ static kal_uint32 feature_control(
 		case MSDK_SCENARIO_ID_SLIM_VIDEO:
 		case MSDK_SCENARIO_ID_CAMERA_PREVIEW:
 		case MSDK_SCENARIO_ID_CUSTOM1:
-			break;
 		case MSDK_SCENARIO_ID_CUSTOM2:
-			imgsensor_pd_info.i4BlockNumX = 102;
-			imgsensor_pd_info.i4BlockNumY = 76;
-			memcpy((void *)PDAFinfo, (void *)&imgsensor_pd_info,
-				sizeof(struct SET_PD_BLOCK_INFO_T));
-			break;
 		default:
 			break;
 		}
@@ -2737,7 +2729,7 @@ static kal_uint32 feature_control(
 			*(MUINT32 *)(uintptr_t)(*(feature_data+1)) = 0;
 			break;
 		case MSDK_SCENARIO_ID_CUSTOM2:
-			*(MUINT32 *)(uintptr_t)(*(feature_data+1)) = 1;
+			*(MUINT32 *)(uintptr_t)(*(feature_data+1)) = 0;
 			break;
 		default:
 			*(MUINT32 *)(uintptr_t)(*(feature_data+1)) = 0;

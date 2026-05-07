@@ -321,7 +321,7 @@ static void write_shutter(kal_uint16 shutter)
 	write_cmos_sensor_8(0x0203, shutter & 0xFF);
 
 
-	LOG_INF("shutter =%d, framelength =%d\n", shutter, imgsensor.frame_length);
+	//LOG_INF("shutter =%d, framelength =%d\n", shutter, imgsensor.frame_length);
 
 
 }	/*	write_shutter  */
@@ -536,6 +536,9 @@ static void sensor_init(void)
 	write_cmos_sensor_8(0X3069, 0X87);
 	write_cmos_sensor_8(0X3400, 0X00);
 	write_cmos_sensor_8(0X0B00, 0X01);
+	write_cmos_sensor_8(0x392F, 0X01);
+	write_cmos_sensor_8(0x3930, 0X80);
+	write_cmos_sensor_8(0x3931, 0X02);
 	write_cmos_sensor_8(0X0100, 0X00);
 }	/*	sensor_init  */
 
@@ -928,7 +931,7 @@ static void slim_video_setting(void)
 
 }
 
-extern unsigned int s5k4h7yx_read_region(struct i2c_client *client, unsigned int addr,unsigned char *data,unsigned int size);
+extern unsigned int s5k4h7yx_hlt_read_region(struct i2c_client *client, unsigned int addr,unsigned char *data,unsigned int size);
 
 
 /*************************************************************************
@@ -951,24 +954,20 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 {
 	kal_uint8 i = 0;
 	kal_uint8 retry = 2;
-
 	/* sensor have two i2c address 0x6c 0x6d & 0x21 0x20, we should detect the module used i2c address */
 	while (imgsensor_info.i2c_addr_table[i] != 0xff) {
 		spin_lock(&imgsensor_drv_lock);
 		imgsensor.i2c_write_id = imgsensor_info.i2c_addr_table[i];
-		LOG_INF("s5k4h7yxmipiraw i2c_write_id = %x\r\n", imgsensor.i2c_write_id);
+        LOG_INF("s5k4h7yxmipiraw i2c_write_id = %x\r\n", imgsensor.i2c_write_id);
 		spin_unlock(&imgsensor_drv_lock);
 		do {
 			*sensor_id = return_sensor_id();
 			if (*sensor_id == imgsensor_info.sensor_id) {
-				if(s5k4h7yx_read_region(NULL, 0, NULL, 0) < 0){
-					pr_err("s5k4h7yx read otp failed");
-					*sensor_id = 0xFFFFFFFF;
-					return ERROR_SENSOR_CONNECT_FAIL;
-				} else {
-					LOG_INF("s5k4h7yxmipiraw sensor id: 0x%x\n",*sensor_id);
-					return ERROR_NONE;
+				if(s5k4h7yx_hlt_read_region(NULL, 0, NULL, 0) < 0){
+				    pr_err("s5k4h7yx read otp failed");
 				}
+				/* return ERROR_NONE; */
+				break;
 			}
 			retry--;
 		} while (retry > 0);
@@ -1012,11 +1011,13 @@ static kal_uint32 open(void)
 	while (imgsensor_info.i2c_addr_table[i] != 0xff) {
 		spin_lock(&imgsensor_drv_lock);
 		imgsensor.i2c_write_id = imgsensor_info.i2c_addr_table[i];
+		LOG_INF("s5k4h7yxmipiraw yutao open sensor_id = %x\r\n", imgsensor.i2c_write_id);
 		spin_unlock(&imgsensor_drv_lock);
 		do {
 			sensor_id = return_sensor_id();
+			LOG_INF("s5k4h7yxmipiraw open sensor_id = %x\r\n", sensor_id);
 			if (sensor_id == imgsensor_info.sensor_id) {
-				LOG_INF("s5k4h7yxmipiraw i2c write id: 0x%x, sensor id: 0x%x\n", imgsensor.i2c_write_id, sensor_id);
+				LOG_INF("i2c write id: 0x%x, sensor id: 0x%x\n", imgsensor.i2c_write_id, sensor_id);
 				break;
 			}
 			LOG_INF("Read sensor id fail, id: 0x%x\n", sensor_id);
@@ -1568,7 +1569,7 @@ static kal_uint32 feature_control(MSDK_SENSOR_FEATURE_ENUM feature_id,
     struct SENSOR_WINSIZE_INFO_STRUCT *wininfo;
     MSDK_SENSOR_REG_INFO_STRUCT *sensor_reg_data=(MSDK_SENSOR_REG_INFO_STRUCT *) feature_para;
 
-	LOG_INF("feature_id = %d", feature_id);
+	//LOG_INF("feature_id = %d", feature_id);
 	switch (feature_id) {
 		case SENSOR_FEATURE_GET_PERIOD:
 			*feature_return_para_16++ = imgsensor.line_length;

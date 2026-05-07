@@ -19,17 +19,17 @@
 /* SENSOR MIRROR FLIP INFO */
 #define GC2385_BW_MIRROR_FLIP_ENABLE    1
 #if GC2385_BW_MIRROR_FLIP_ENABLE
-#define GC2385_BW_MIRROR        0xd7
-#define GC2385_BW_STARTY        0x04
-#define GC2385_BW_STARTX        0x06
-#define GC2385_BW_BLK_Select_H  0x00
-#define GC2385_BW_BLK_Select_L  0x3c
-#else
-#define GC2385_BW_MIRROR        0xd4
+#define GC2385_BW_MIRROR        0xd5
 #define GC2385_BW_STARTY        0x03
-#define GC2385_BW_STARTX        0x05
+#define GC2385_BW_STARTX        0x06
 #define GC2385_BW_BLK_Select_H  0x3c
 #define GC2385_BW_BLK_Select_L  0x00
+#else
+#define GC2385_BW_MIRROR        0xd6
+#define GC2385_BW_STARTY        0x04
+#define GC2385_BW_STARTX        0x05
+#define GC2385_BW_BLK_Select_H  0x00
+#define GC2385_BW_BLK_Select_L  0x3c
 #endif
 
 enum{
@@ -39,7 +39,6 @@ enum{
 	IMGSENSOR_MODE_VIDEO,
 	IMGSENSOR_MODE_HIGH_SPEED_VIDEO,
 	IMGSENSOR_MODE_SLIM_VIDEO,
-	IMGSENSOR_MODE_CUSTOM1,
 };
 
 struct imgsensor_mode_struct {
@@ -73,8 +72,6 @@ struct imgsensor_struct {
 	enum MSDK_SCENARIO_ID_ENUM current_scenario_id;
 	kal_uint8  ihdr_en;
 	kal_uint8 i2c_write_id;
-	kal_uint8 current_ae_effective_frame;
-	struct IMGSENSOR_AE_FRM_MODE ae_frm_mode;
 };
 
 /* SENSOR PRIVATE STRUCT FOR CONSTANT */
@@ -87,10 +84,8 @@ struct imgsensor_info_struct {
 	struct imgsensor_mode_struct normal_video;
 	struct imgsensor_mode_struct hs_video;
 	struct imgsensor_mode_struct slim_video;
-	struct  imgsensor_mode_struct custom1;
 	kal_uint8  ae_shut_delay_frame;
 	kal_uint8  ae_sensor_gain_delay_frame;
-	kal_uint8  frame_time_delay_frame;
 	kal_uint8  ae_ispGain_delay_frame;
 	kal_uint8  ihdr_support;
 	kal_uint8  ihdr_le_firstline;
@@ -100,7 +95,6 @@ struct imgsensor_info_struct {
 	kal_uint8  video_delay_frame;
 	kal_uint8  hs_video_delay_frame;
 	kal_uint8  slim_video_delay_frame;
-	kal_uint8  custom1_delay_frame;
 	kal_uint8  margin;
 	kal_uint32 min_shutter;
 	kal_uint32 max_frame_length;
@@ -112,15 +106,10 @@ struct imgsensor_info_struct {
 	kal_uint8  mclk;
 	kal_uint8  mipi_lane_num;
 	kal_uint8  i2c_addr_table[5];
-	kal_uint32 i2c_speed;
 };
 
 extern int iReadRegI2C(u8 *a_pSendData, u16 a_sizeSendData, u8 *a_pRecvData, u16 a_sizeRecvData, u16 i2cId);
 extern int iWriteRegI2C(u8 *a_pSendData, u16 a_sizeSendData, u16 i2cId);
 extern int iWriteReg(u16 a_u2Addr, u32 a_u4Data, u32 a_u4Bytes, u16 i2cId);
-extern void kdSetI2CSpeed(u16 i2cSpeed);
-extern int iBurstWriteReg(u8 *pData, u32 bytes, u16 i2cId);
-extern int iBurstWriteReg_multi(u8 *pData, u32 bytes, u16 i2cId, u16 transfer_length, u16 timing);
-extern int iWriteRegI2CTiming(u8 *a_pSendData, u16 a_sizeSendData, u16 i2cId, u16 timing);
 
 #endif

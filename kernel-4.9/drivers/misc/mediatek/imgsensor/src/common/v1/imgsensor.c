@@ -583,28 +583,46 @@ int imgsensor_set_driver(struct IMGSENSOR_SENSOR *psensor)
 //Yankun.Zhai@ODM_HQ.Multimedia.Camera.driver, 2018/12/13, Add for bring up start
                 switch(psensor->inst.sensor_idx){
                 case IMGSENSOR_SENSOR_IDX_MAIN:
+#ifdef ODM_WT_EDIT
+                     if((pSensorList[drv_idx].id != HI1336_SENSOR_ID) && \
+                                         (pSensorList[drv_idx].id != HI1336_HOLITECH_SENSOR_ID) && \
+                                         (pSensorList[drv_idx].id != HI1336_HAOZE_SENSOR_ID))
+#else
                      if((pSensorList[drv_idx].id != OV12A10_SENSOR_ID)&& \
-                     (pSensorList[drv_idx].id != OV12A10_ST_SENSOR_ID)&& \
-                     (pSensorList[drv_idx].id != OV12A10_QTECH_SENSOR_ID)){
+					 (pSensorList[drv_idx].id != OV12A10_ST_SENSOR_ID))
+#endif
+                     {
                         continue;
                      }
                     break;
                 case IMGSENSOR_SENSOR_IDX_SUB:
-                     if((pSensorList[drv_idx].id != S5K4H7YX_HLT_SENSOR_ID)&& \
-                     (pSensorList[drv_idx].id != S5K4H7YX_ST_SENSOR_ID)&& \
-                     (pSensorList[drv_idx].id != OV8856_SENSOR_ID)){
+#ifdef ODM_WT_EDIT
+                     if((pSensorList[drv_idx].id != GC5035_HOLITECH_SENSOR_ID) && \
+                                         (pSensorList[drv_idx].id != HI556_LCE_SENSOR_ID) && \
+                                         (pSensorList[drv_idx].id != GC5035_B_SENSOR_ID))
+#else
+                     if((pSensorList[drv_idx].id != S5K4H7YX_HLT_SENSOR_ID))
+#endif
+                     {
                         continue;
                      }
                     break;
                 case IMGSENSOR_SENSOR_IDX_MAIN2:
+#ifdef ODM_WT_EDIT
+                     if((pSensorList[drv_idx].id != GC2375H_CHENGXIANGTONG_SENSOR_ID) && \
+                                         (pSensorList[drv_idx].id != GC02M1B_CXT_SENSOR_ID) && \
+                                         (pSensorList[drv_idx].id != GC2385_SENSOR_ID))
+#else
                      if((pSensorList[drv_idx].id != GC2375H_SENSOR_ID) && \
-                     (pSensorList[drv_idx].id != GC2385_SENSOR_ID)){
+					 (pSensorList[drv_idx].id != GC2385_SENSOR_ID))
+#endif
+                     {
                         continue;
                      }
                     break;
                 case IMGSENSOR_SENSOR_IDX_SUB2:
                      if((pSensorList[drv_idx].id != GC02M0_SENSOR_ID) && \
-                     (pSensorList[drv_idx].id != GC2385_BW_SENSOR_ID)){
+					 (pSensorList[drv_idx].id != GC2385_BW_SENSOR_ID)){
                         continue;
                      }
                     break;
@@ -631,8 +649,13 @@ int imgsensor_set_driver(struct IMGSENSOR_SENSOR *psensor)
 							strcpy(cam_buff.camera_front_name, psensor_inst->psensor_name);
 							break;
 						case IMGSENSOR_SENSOR_IDX_MAIN2:
+							/* Tao.Li@Camera.Driver, 2019/12/25, add for [Cola HQ hardwareinfo bringup] */
+							#ifdef ODM_WT_EDIT
+							strcpy(cam_buff.camera_aux_name, psensor_inst->psensor_name);
+							#else
 							//cat /proc/devinfo/camera_micro
 							strcpy(cam_buff.camera_micro_name, psensor_inst->psensor_name);
+							#endif
 							break;
 						case IMGSENSOR_SENSOR_IDX_SUB2:
 							//cat /proc/devinfo/camera_aux
