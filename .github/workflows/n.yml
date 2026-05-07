@@ -1,56 +1,43 @@
-name: Sync F2FS from A15
+name: Restore Upstream FS Folder Only
 on:
-  workflow_dispatch:
-
-permissions:
-  contents: write
+  workflow_dispatch: # Allows manual trigger from GitHub Actions UI
 
 jobs:
-  copy-f2fs:
+  restore:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout A31 Repo (Target)
-        uses: actions/checkout@v4
-        with:
-          path: a31_repo
+    - name: Checkout Your Source
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }} # Needed to push changes back to your repo
 
-      - name: Checkout A15 Repo (Source)
-        uses: actions/checkout@v4
-        with:
-          repository: oppo-source/A15
-          path: a15_repo
+    - name: Restore Clean Upstream FS Folder
+      run: |
+        # 1. Nuke the broken filesystem folder completely from your workspace
+        rm -rf kernel-4.9/fs
+        
+        # 2. Clone only the target repository metadata using sparse checkout
+        git clone --depth=1 --filter=blob:none --sparse https://github.com/oppo-source/A31 temp_upstream
+        cd temp_upstream
+        git sparse-checkout set kernel-4.9/fs
+        cd ..
+        
+        # 3. Move the clean stock fs folder directly into your kernel tree
+        mv temp_upstream/kernel-4.9/fs kernel-4.9/
+        rm -rf temp_upstream
 
-      - name: Sync F2FS and Missing Headers
-        run: |
-          # 1. Copy F2FS Driver
-          mkdir -p a31_repo/kernel-4.9/fs/
-          cp -rv a15_repo/kernel-4.9/fs/f2fs a31_repo/kernel-4.9/fs/
-
-          # 2. Copy missing overflow.h (Fixes the fatal error)
-          mkdir -p a31_repo/kernel-4.9/include/linux/
-          if [ -f a15_repo/kernel-4.9/include/linux/overflow.h ]; then
-            cp -v a15_repo/kernel-4.9/include/linux/overflow.h a31_repo/kernel-4.9/include/linux/
-          fi
-
-          # 3. Copy f2fs_fs.h (Essential for F2FS compilation)
-          if [ -f a15_repo/kernel-4.9/include/linux/f2fs_fs.h ]; then
-            cp -v a15_repo/kernel-4.9/include/linux/f2fs_fs.h a31_repo/kernel-4.9/include/linux/
-          fi
-
-          # 4. Copy UAPI headers (User API for tools like make_f2fs)
-          mkdir -p a31_repo/kernel-4.9/include/uapi/linux/
-          if [ -f a15_repo/kernel-4.9/include/uapi/linux/f2fs.h ]; then
-            cp -v a15_repo/kernel-4.9/include/uapi/linux/f2fs.h a31_repo/kernel-4.9/include/uapi/linux/
-          fi
-          
-      - name: Commit and Push changes
-        run: |
-          cd a31_repo
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add kernel-4.9/fs/f2fs
-          git add kernel-4.9/include/linux/overflow.h || echo "No overflow.h to add"
-          git add kernel-4.9/include/linux/f2fs_fs.h || echo "No f2fs_fs.h to add"
-          git add kernel-4.9/include/uapi/linux/f2fs.h || echo "No uapi header to add"
-          git commit -m "Sync F2FS and missing headers from Oppo A15" || exit 0
+    - name: Commit and Push Restored FS
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        
+        git add kernel-4.9/fs
+        
+        # Check if there are actual changes to commit so the workflow doesn't crash
+        if git diff-index --quiet HEAD; then
+          echo "No changes detected. FS folder is already up to date."
+        else
+          git commit -m "System: Completely restored clean upstream stock fs folder"
           git push
+        fi
