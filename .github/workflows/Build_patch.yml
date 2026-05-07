@@ -1,7 +1,7 @@
 name: Sync-Oppo-A12-Imgsensor-Only
 
 on:
-  workflow_dispatch: # Allows manual trigger whenever you're ready
+  workflow_dispatch:
 
 jobs:
   sync-drivers:
@@ -10,23 +10,26 @@ jobs:
     - name: Checkout Your A31 Source
       uses: actions/checkout@v4
 
-    - name: Replace Imgsensor Drivers
+    - name: Replace Drivers
       run: |
-        # Target path based on your kernel structure
-        TARGET_DIR="kernel-4.9/drivers/misc/mediatek/imgsensor"
+        # Define target paths
+        IMGSENSOR_DIR="kernel-4.9/drivers/misc/mediatek/imgsensor"
+        CAMCAL_DIR="kernel-4.9/drivers/misc/mediatek/cam_cal"
         
-        # 1. Remove the existing faulty or incomplete folder
-        echo "Deleting existing imgsensor folder..."
-        rm -rf $TARGET_DIR
+        # 1. Remove existing faulty folders
+        echo "Cleaning old driver folders..."
+        rm -rf $IMGSENSOR_DIR
+        rm -rf $CAMCAL_DIR
         
-        # 2. Clone the KAGA-KOKO A12 source (android-9 branch)
+        # 2. Clone the KAGA-KOKO A12 source
         echo "Cloning A12 source from KAGA-KOKO..."
         git clone https://github.com/KAGA-KOKO/kernel-oppo6765 -b android-9 --depth=1 temp_a12
         
-        # 3. Move the verified imgsensor folder into your tree
-        echo "Moving A12 imgsensor drivers into position..."
+        # 3. Move verified drivers into position
+        echo "Moving A12 drivers into the tree..."
         mkdir -p kernel-4.9/drivers/misc/mediatek/
         mv temp_a12/drivers/misc/mediatek/imgsensor kernel-4.9/drivers/misc/mediatek/
+        mv temp_a12/drivers/misc/mediatek/cam_cal kernel-4.9/drivers/misc/mediatek/
         
         # 4. Cleanup
         rm -rf temp_a12
@@ -37,5 +40,6 @@ jobs:
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         git add kernel-4.9/drivers/misc/mediatek/imgsensor
-        git commit -m "Drivers: Replace imgsensor with verified Oppo A12 source" || echo "No changes to commit"
+        git add kernel-4.9/drivers/misc/mediatek/cam_cal
+        git commit -m "Drivers: Replace imgsensor and cam_cal with verified A12 source" || echo "No changes to commit"
         git push
